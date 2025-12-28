@@ -1,4 +1,4 @@
-# Multi-Layer Research Agent 🔬📚
+# Automated Evidence-Based Research & Insight Engine 🔬📚
 
 **An autonomous AI agent designed to generate high-quality, Scopus-standard academic research papers through a rigorous multi-stage pipeline.**
 
