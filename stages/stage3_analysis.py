@@ -155,8 +155,8 @@ def stage3_document_analysis(documents):
     analyzed_documents = []
     
     # Process documents in parallel
-    # max_workers=2 to reduce Rate Limits and Local LLM load
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    # Increased max_workers from 2 to 4 to improve throughput
+    with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
         
         for future in as_completed(future_to_doc):
