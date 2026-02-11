@@ -1,0 +1,3 @@
+## 2025-02-12 - Parallelization inconsistency across stages
+**Learning:** While Stage 2 and Stage 3 in the research pipeline were already utilizing `ThreadPoolExecutor` for parallel document discovery and analysis, Stage 4 (Scoring) was implemented sequentially. This created a significant bottleneck as the number of documents increased, especially since each document requires an independent LLM API call.
+**Action:** Always check all stages in a multi-stage pipeline for sequential I/O or API-bound operations that can be safely parallelized. Standardize parallelization patterns across the codebase to ensure consistent performance.
