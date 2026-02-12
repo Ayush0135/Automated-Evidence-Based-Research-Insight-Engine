@@ -77,7 +77,8 @@ def analyze_single_document(doc):
 
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
                 futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
+                # Preserve order by iterating over futures list
+                for f in futures:
                     res = f.result()
                     if res: chunk_summaries.append(res)
             
@@ -157,9 +158,10 @@ def stage3_document_analysis(documents):
     # Process documents in parallel
     # max_workers=2 to reduce Rate Limits and Local LLM load
     with ThreadPoolExecutor(max_workers=2) as executor:
+        # Dictionary maintains insertion order in Python 3.7+
         future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
         
-        for future in as_completed(future_to_doc):
+        for future in future_to_doc:
             result = future.result()
             if result:
                 analyzed_documents.append(result)
