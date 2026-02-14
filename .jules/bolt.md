@@ -1,0 +1,3 @@
+## 2025-05-15 - Stage 4 Sequential Bottleneck and Ordering Anti-pattern
+**Learning:** Stage 4 (Academic Scoring) was implemented sequentially, causing a significant performance bottleneck for I/O-bound LLM calls. Additionally, the use of `as_completed()` with `ThreadPoolExecutor` in Stages 2 and 3 was found to be a performance anti-pattern in this specific codebase, as it scrambles document relevance and chunk chronology, which negatively impacts synthesis quality.
+**Action:** Parallelize Stage 4 using `ThreadPoolExecutor` and refactor Stages 2, 3, and 4 to iterate over futures in submission order to preserve sequence and relevance.
