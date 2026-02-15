@@ -82,9 +82,10 @@ def stage2_document_discovery(decomposition_data):
     print(f"Executing {len(all_queries)} search queries in parallel...")
     
     with ThreadPoolExecutor(max_workers=5) as search_executor:
-        future_to_query = {search_executor.submit(execute_search_query, s, q): (s, q) for s, q in all_queries}
+        # Submit tasks and preserve order by iterating over the list of futures
+        futures = [search_executor.submit(execute_search_query, s, q) for s, q in all_queries]
         
-        for future in as_completed(future_to_query):
+        for future in futures:
             results = future.result()
             for item in results:
                 url = item.get('link')
@@ -104,9 +105,10 @@ def stage2_document_discovery(decomposition_data):
     # 2. Process downloads in parallel
     # max_workers=5 is a safe number to not overwhelm network or get IP blocked
     with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
+        # Preserve relevance-based ranking by iterating over the list of futures in submission order
+        futures = [executor.submit(process_search_item, item) for item in search_candidates]
         
-        for future in as_completed(future_to_item):
+        for future in futures:
             result = future.result()
             if result:
                 all_documents.append(result)
