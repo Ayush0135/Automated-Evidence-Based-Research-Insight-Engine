@@ -1,0 +1,3 @@
+## 2025-05-15 - Document Order Preservation in Parallel Pipelines
+**Learning:** Using `as_completed()` with `ThreadPoolExecutor` is a performance anti-pattern in relevance-based pipelines. While it allows processing results as soon as they are ready, it scrambles the input sequence. In this codebase, downstream stages like Stage 5 (Filtering) and Stage 6 (Synthesis) rely on the relevance-based document ranking established in Stage 2. Scrambling this order degrades the quality of the generated research paper.
+**Action:** When parallelizing I/O-bound tasks where input sequence matters, always iterate over the list of futures in submission order instead of using `as_completed()`.
