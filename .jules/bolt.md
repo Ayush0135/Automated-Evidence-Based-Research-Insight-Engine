@@ -1,0 +1,3 @@
+## 2025-05-14 - Parallelizing Scoring and Fixing Order Anti-pattern
+**Learning:** In a multi-stage research pipeline, using `as_completed()` with `ThreadPoolExecutor` is a performance anti-pattern because it scrambles document relevance and text chunk chronology. While it might appear faster by yielding results immediately, the resulting out-of-order data degrades synthesis quality and can trigger expensive Stage 8 re-runs, leading to a much slower end-to-end execution.
+**Action:** Always prefer iterating over submitted futures in order when document relevance or chronological sequence is important for downstream stages.
