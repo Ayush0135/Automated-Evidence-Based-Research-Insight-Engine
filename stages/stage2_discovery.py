@@ -1,6 +1,6 @@
 from utils.search import google_search, download_and_parse
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 def process_search_item(item):
     """
@@ -81,17 +81,17 @@ def stage2_document_discovery(decomposition_data):
 
     print(f"Executing {len(all_queries)} search queries in parallel...")
     
+    # Performance Note: Iterating over futures in order to preserve relevance ranking.
     with ThreadPoolExecutor(max_workers=5) as search_executor:
-        future_to_query = {search_executor.submit(execute_search_query, s, q): (s, q) for s, q in all_queries}
+        futures = [search_executor.submit(execute_search_query, s, q) for s, q in all_queries]
         
-        for future in as_completed(future_to_query):
+        for future in futures:
             results = future.result()
             for item in results:
                 url = item.get('link')
                 if url in seen_urls:
                     continue
                 seen_urls.add(url)
-                # print(f"    Found: {item.get('title')[:40]}...")
                 search_candidates.append(item)
 
     # Limit to top 20 candidates total (User Constraint)
@@ -104,16 +104,13 @@ def stage2_document_discovery(decomposition_data):
     # 2. Process downloads in parallel
     # max_workers=5 is a safe number to not overwhelm network or get IP blocked
     with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
+        futures = [executor.submit(process_search_item, item) for item in search_candidates]
         
-        for future in as_completed(future_to_item):
+        for future in futures:
             result = future.result()
             if result:
                 all_documents.append(result)
                 print(f"    + Downloaded: {result['title'][:40]}...")
-            else:
-                # Optional: indicate skip/failure
-                pass
     
     print(f"Total documents retrieved: {len(all_documents)}")
     return all_documents
