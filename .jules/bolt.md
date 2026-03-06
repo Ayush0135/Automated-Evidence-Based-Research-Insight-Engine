@@ -1,0 +1,3 @@
+## 2025-05-14 - Order-Preservation Concurrency Anti-pattern
+**Learning:** Using `concurrent.futures.as_completed()` with `ThreadPoolExecutor` in Stages 2 and 3 was scrambling the order of search results and document chunks. Stage 2 relies on Google's relevance ranking, and Stage 3 relies on the chronological order of text chunks for accurate synthesis. `as_completed()` prioritizes completion speed over input sequence, which degrades data quality in this pipeline.
+**Action:** Always iterate over the list of futures in their submission order when gathering results from `ThreadPoolExecutor` in this project to ensure relevance and chronology are preserved while maintaining parallel speed.

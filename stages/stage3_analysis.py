@@ -77,7 +77,8 @@ def analyze_single_document(doc):
 
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
                 futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
+                # Iterate over futures in order of submission to preserve chunk sequence
+                for f in futures:
                     res = f.result()
                     if res: chunk_summaries.append(res)
             
@@ -151,15 +152,20 @@ def analyze_single_document(doc):
         return None
 
 def stage3_document_analysis(documents):
+    """
+    Parallelized Stage 3.
+    Order preservation: Guaranteed by iterating over futures list in submission order.
+    """
     print("\n--- STAGE 3: DOCUMENT ANALYSIS (Parallel) ---")
     analyzed_documents = []
     
     # Process documents in parallel
     # max_workers=2 to reduce Rate Limits and Local LLM load
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
+        futures = [executor.submit(analyze_single_document, doc) for doc in documents]
         
-        for future in as_completed(future_to_doc):
+        # Iterate over futures in order of submission to preserve input document order
+        for future in futures:
             result = future.result()
             if result:
                 analyzed_documents.append(result)
