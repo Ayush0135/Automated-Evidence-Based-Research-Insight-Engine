@@ -1,0 +1,3 @@
+## 2025-05-14 - Order-Preserving Parallelization in Research Pipeline
+**Learning:** Using `as_completed()` with `ThreadPoolExecutor` in Stages 2, 3, and 4 is a performance anti-pattern for this specific architecture. While it processes items as they finish, it scrambles the document relevance ranking (Stage 2 & 4) and text chunk chronology (Stage 3), which degrades the quality of the final research synthesis. Stage 4 was also identified as a sequential bottleneck.
+**Action:** Parallelize Stage 4 with 3 workers and refactor Stages 2, 3, and 4 to iterate over the list of futures in submission order to maintain input sequence while benefiting from I/O-bound speedups.

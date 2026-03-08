@@ -75,9 +75,10 @@ def analyze_single_document(doc):
                 except:
                     return ""
 
+            # Bolt Optimization: Maintain chunk order for logical chronology
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
                 futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
+                for f in futures:
                     res = f.result()
                     if res: chunk_summaries.append(res)
             
@@ -156,10 +157,11 @@ def stage3_document_analysis(documents):
     
     # Process documents in parallel
     # max_workers=2 to reduce Rate Limits and Local LLM load
+    # Bolt Optimization: Maintain document order for relevance consistency
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
+        futures = [executor.submit(analyze_single_document, doc) for doc in documents]
         
-        for future in as_completed(future_to_doc):
+        for future in futures:
             result = future.result()
             if result:
                 analyzed_documents.append(result)
