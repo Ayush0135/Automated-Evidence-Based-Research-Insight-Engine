@@ -1,0 +1,3 @@
+## 2025-05-15 - Order-Sensitive Parallelization Anti-Pattern
+**Learning:** Using `as_completed()` with `ThreadPoolExecutor` for pipeline stages that depend on input sequence (like document relevance ranking or chronological text chunks) is a performance anti-pattern. While it returns results as they finish, it scrambles the order, which can degrade the quality of downstream synthesis or filtering.
+**Action:** Always iterate over the list of submitted futures in order when the sequence of items matters. Use `futures = [executor.submit(...) for item in items]` followed by `for f in futures: result = f.result()`.
