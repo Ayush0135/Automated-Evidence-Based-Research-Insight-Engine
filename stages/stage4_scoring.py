@@ -2,16 +2,18 @@ from utils.llm import query_groq
 import json
 import re
 
+from concurrent.futures import ThreadPoolExecutor
+
 def stage4_academic_scoring(analyzed_documents, topic):
     print("\n--- STAGE 4: ACADEMIC SCORING (Groq) ---")
     scored_documents = []
     
-    for doc in analyzed_documents:
+    def score_document(doc):
         analysis = doc.get('analysis', {})
         if not analysis:
-            continue
+            return None
             
-        print(f"Scoring: {doc['title'][:50]}...")
+        # print(f"Scoring: {doc['title'][:50]}...")
         
         prompt = f"""
         Role: Strict Academic Reviewer.
@@ -41,8 +43,8 @@ def stage4_academic_scoring(analyzed_documents, topic):
         No explanations. No markdown.
         """
         
-        response = query_groq(prompt, json_mode=True, fallback_to_others=True)
         try:
+            response = query_groq(prompt, json_mode=True, fallback_to_others=True)
             # Robust Extraction
             match = re.search(r'\{.*\}', response, re.DOTALL)
             if match:
@@ -54,10 +56,22 @@ def stage4_academic_scoring(analyzed_documents, topic):
                 score_data = json.loads(cleaned)
                 
             doc['scoring'] = score_data
-            scored_documents.append(doc)
-            print(f"  Score: {score_data.get('score')}")
+            return doc
         except Exception as e:
-            print(f"  Error scoring document: {e}")
-            continue
+            print(f"  Error scoring document {doc.get('title', 'Unknown')[:20]}: {e}")
+            return None
+
+    # Performance Boost: Parallelize scoring (I/O bound LLM calls)
+    # Using 3 workers to balance speed and rate limits
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # We iterate over documents and submit them to preserve order when gathering results
+        futures = [executor.submit(score_document, doc) for doc in analyzed_documents]
+
+        # Iterating over futures in the order they were submitted preserves document ranking
+        for future in futures:
+            result = future.result()
+            if result:
+                scored_documents.append(result)
+                print(f"  + Scored: {result['title'][:40]}... [Score: {result['scoring'].get('score')}]")
             
     return scored_documents
