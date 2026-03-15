@@ -1,0 +1,3 @@
+## 2025-05-22 - Parallelization Order Preservation
+**Learning:** Using `concurrent.futures.as_completed()` with `ThreadPoolExecutor` for pipeline stages (like Discovery, Analysis, and Scoring) is a performance anti-pattern in this codebase. While it allows processing as soon as any task finishes, it scrambles the order of documents, which can degrade the quality of synthesis in downstream stages (Stage 5/6) that rely on relevance-based ranking.
+**Action:** Always iterate over the list of futures in their submission order when gathering results from `ThreadPoolExecutor` to ensure input sequence is preserved.
