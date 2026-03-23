@@ -1,0 +1,3 @@
+## 2026-03-23 - Ordered Future Iteration for Rank Preservation
+**Learning:** Using `as_completed()` with `ThreadPoolExecutor` in this pipeline is a performance anti-pattern. While it returns results as soon as they are ready, it scrambles the document order. Since Stage 2 (Discovery) ranks documents by relevance and Stage 3 (Analysis) processes text chunks chronologically, losing this order degrades the quality of Stage 5 (Filtering) and Stage 6 (Synthesis).
+**Action:** Always gather results by iterating over the list of futures in their submission order (`for future in futures: result = future.result()`) to preserve input sequence and ranking.
