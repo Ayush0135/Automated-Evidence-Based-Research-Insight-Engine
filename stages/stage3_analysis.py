@@ -1,7 +1,7 @@
 from utils.llm import query_gemini
 import json
 import re
-import time
+from concurrent.futures import ThreadPoolExecutor
 
 def chunk_text(text, chunk_size=12000, overlap=500):
     """
@@ -40,9 +40,11 @@ def extract_json(text):
     except:
         return None
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 def analyze_single_document(doc):
+    """
+    Helper to analyze a single document.
+    Handles chunking for large documents and ensures internal chronology is preserved.
+    """
     try:
         # print(f"Analyzing: {doc['title'][:30]}...")
         full_text = doc['raw_text']
@@ -76,15 +78,17 @@ def analyze_single_document(doc):
                     return ""
 
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
+                # Submit all chunks and preserve order
                 futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
+
+                # Critical: Iterate over futures in submission order to preserve logical chronology
+                for f in futures:
                     res = f.result()
                     if res: chunk_summaries.append(res)
             
             text_context = "\n".join(chunk_summaries)
         else:
-            text_content = full_text[:20000] 
-            text_context = text_content
+            text_context = full_text[:20000]
 
         prompt = f"""
         Analyze the following research document content (or extracted summaries of it).
@@ -151,15 +155,21 @@ def analyze_single_document(doc):
         return None
 
 def stage3_document_analysis(documents):
-    print("\n--- STAGE 3: DOCUMENT ANALYSIS (Parallel) ---")
+    """
+    Stage 3: Document Analysis
+    Analyzes multiple documents in parallel while preserving document sequence.
+    """
+    print("\n--- STAGE 3: DOCUMENT ANALYSIS (Order-Preserving) ---")
     analyzed_documents = []
     
     # Process documents in parallel
     # max_workers=2 to reduce Rate Limits and Local LLM load
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
+        # Submit all documents and keep track of futures to preserve order
+        futures = [executor.submit(analyze_single_document, doc) for doc in documents]
         
-        for future in as_completed(future_to_doc):
+        # Iterate over futures in submission order to preserve document relevance sequence
+        for future in futures:
             result = future.result()
             if result:
                 analyzed_documents.append(result)
