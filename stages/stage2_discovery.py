@@ -1,6 +1,6 @@
 from utils.search import google_search, download_and_parse
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 def process_search_item(item):
     """
@@ -81,10 +81,12 @@ def stage2_document_discovery(decomposition_data):
 
     print(f"Executing {len(all_queries)} search queries in parallel...")
     
+    # Use ThreadPoolExecutor to run search queries in parallel
+    # Iterate over futures in the order they were submitted to maintain relevance-based ranking
     with ThreadPoolExecutor(max_workers=5) as search_executor:
-        future_to_query = {search_executor.submit(execute_search_query, s, q): (s, q) for s, q in all_queries}
+        futures = [search_executor.submit(execute_search_query, s, q) for s, q in all_queries]
         
-        for future in as_completed(future_to_query):
+        for future in futures:
             results = future.result()
             for item in results:
                 url = item.get('link')
@@ -103,10 +105,11 @@ def stage2_document_discovery(decomposition_data):
 
     # 2. Process downloads in parallel
     # max_workers=5 is a safe number to not overwhelm network or get IP blocked
+    # Gathering results in submission order to preserve the ranking from search results
     with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
+        futures = [executor.submit(process_search_item, item) for item in search_candidates]
         
-        for future in as_completed(future_to_item):
+        for future in futures:
             result = future.result()
             if result:
                 all_documents.append(result)
