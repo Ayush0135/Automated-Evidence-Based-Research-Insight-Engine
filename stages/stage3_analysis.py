@@ -40,7 +40,7 @@ def extract_json(text):
     except:
         return None
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 def analyze_single_document(doc):
     try:
@@ -76,8 +76,11 @@ def analyze_single_document(doc):
                     return ""
 
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
+                # Submit tasks and maintain a list of futures to preserve chronological order
                 futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
+                # Iterating over the futures list (instead of as_completed) ensures results
+                # are gathered in the correct sequence of the document.
+                for f in futures:
                     res = f.result()
                     if res: chunk_summaries.append(res)
             
@@ -157,9 +160,10 @@ def stage3_document_analysis(documents):
     # Process documents in parallel
     # max_workers=2 to reduce Rate Limits and Local LLM load
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
+        # Submit all tasks and store in a list to preserve ranking order
+        futures = [executor.submit(analyze_single_document, doc) for doc in documents]
         
-        for future in as_completed(future_to_doc):
+        for future in futures:
             result = future.result()
             if result:
                 analyzed_documents.append(result)
