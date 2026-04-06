@@ -2,6 +2,7 @@ from utils.llm import query_gemini
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 def chunk_text(text, chunk_size=12000, overlap=500):
     """
@@ -40,8 +41,6 @@ def extract_json(text):
     except:
         return None
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 def analyze_single_document(doc):
     try:
         # print(f"Analyzing: {doc['title'][:30]}...")
@@ -76,8 +75,10 @@ def analyze_single_document(doc):
                     return ""
 
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
+                # Use a list to store futures in SUBMISSION ORDER to preserve chronological sequence
                 futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
+                # Iterate over futures in the order they were submitted
+                for f in futures:
                     res = f.result()
                     if res: chunk_summaries.append(res)
             
@@ -157,9 +158,11 @@ def stage3_document_analysis(documents):
     # Process documents in parallel
     # max_workers=2 to reduce Rate Limits and Local LLM load
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
+        # Maintain original document order by storing futures in a list
+        futures = [executor.submit(analyze_single_document, doc) for doc in documents]
         
-        for future in as_completed(future_to_doc):
+        # Iterate over futures in SUBMISSION ORDER to preserve relevance ranking
+        for future in futures:
             result = future.result()
             if result:
                 analyzed_documents.append(result)
