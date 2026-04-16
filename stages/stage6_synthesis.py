@@ -9,7 +9,8 @@ def stage6_research_synthesis(knowledge_base, topic):
         print("No knowledge base available. Cannot synthesize.")
         return None
         
-    kb_text = json.dumps(knowledge_base, indent=2)
+    # Use compact JSON to save tokens in the prompt
+    kb_text = json.dumps(knowledge_base)
     
     prompt = f"""
     You are an expert academic researcher (Author Model).

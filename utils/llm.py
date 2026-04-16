@@ -15,8 +15,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # Initialize Clients
+_gemini_model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+    _gemini_model = genai.GenerativeModel('gemini-2.0-flash')
 
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
@@ -24,11 +26,8 @@ anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY els
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not found.")
-    
-    # Updated to gemini-2.0-flash based on available models
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    if not GEMINI_API_KEY or not _gemini_model:
+        raise ValueError("GEMINI_API_KEY not found or model init failed.")
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -37,7 +36,7 @@ def _call_gemini(prompt):
     
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(prompt)
+            response = _gemini_model.generate_content(prompt)
             if not response.text:
                 raise ValueError("Gemini returned empty response.")
             return response.text
