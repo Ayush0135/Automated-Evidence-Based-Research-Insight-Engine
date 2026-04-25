@@ -1,0 +1,3 @@
+## 2025-05-15 - Order Preservation in Parallel Stages
+**Learning:** In the research pipeline (Stages 2, 3, 4), using `as_completed()` with `ThreadPoolExecutor` is a performance anti-pattern. While it might slightly reduce tail latency for the entire stage, it scrambles the order of documents (ranked by relevance) or text chunks (chronological). This degradation of input sequence quality outweighs the minor speed gain.
+**Action:** Always iterate over futures in the order they were submitted (`for future in futures: result = future.result()`) to maintain sequence integrity while still benefiting from parallel I/O.
