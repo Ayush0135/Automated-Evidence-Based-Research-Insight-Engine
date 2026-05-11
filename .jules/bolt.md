@@ -1,0 +1,3 @@
+## 2025-05-15 - [Stage 4 Parallelization]
+**Learning:** Sequential LLM calls in research pipelines are the primary I/O bottleneck. Parallelizing with a conservative worker count (e.g., 3) provides significant speedups (2.5x in this case) without overwhelming API rate limits. Iterating directly over submitted futures is the simplest way to maintain strict input-output order preservation, which is critical for relevance-ranked documents.
+**Action:** Identify and parallelize all stages containing sequential network-bound LLM or API requests, ensuring result order is gathered by iterating over the original future submission sequence.
