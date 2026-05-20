@@ -10,6 +10,10 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 
+# Optimization: Global session for connection pooling
+# This reduces TCP/TLS handshake overhead for multiple searches and downloads.
+session = requests.Session()
+
 def google_search(query, num_results=5):
     """
     Performs a Google Custom Search.
@@ -22,7 +26,8 @@ def google_search(query, num_results=5):
         'num': num_results
     }
     try:
-        response = requests.get(url, params=params)
+        # Use session instead of requests.get
+        response = session.get(url, params=params)
         response.raise_for_status()
         return response.json().get('items', [])
     except Exception as e:
@@ -36,7 +41,8 @@ def download_and_parse(url):
     """
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, headers=headers, timeout=10)
+        # Use session instead of requests.get
+        response = session.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
