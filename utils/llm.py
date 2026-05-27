@@ -6,6 +6,7 @@ from groq import Groq
 from anthropic import Anthropic, NotFoundError
 from dotenv import load_dotenv
 from utils.llm_offline import query_offline_llm
+from termcolor import colored # Bolt: Move import to module level for better performance in loops
 
 load_dotenv()
 
@@ -21,14 +22,23 @@ if GEMINI_API_KEY:
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
+# Bolt: Cache Gemini model instance
+_gemini_model = None
+
+def get_gemini_model():
+    global _gemini_model
+    if _gemini_model is None:
+        _gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+    return _gemini_model
+
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not found.")
     
-    # Updated to gemini-2.0-flash based on available models
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    # Bolt: Use cached model
+    model = get_gemini_model()
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -155,7 +165,7 @@ def execute_strategies(strategies, prompt):
              return func(prompt)
         except Exception as e:
             errors.append(str(e))
-            from termcolor import colored
+            # Bolt: termcolor.colored already imported at top level
             
             error_msg = str(e)
             if "429" in error_msg or "Rate limit" in error_msg:
