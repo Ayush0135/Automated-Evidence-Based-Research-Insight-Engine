@@ -1,0 +1,3 @@
+## 2025-05-22 - Parallelizing Academic Scoring
+**Learning:** Stage 4 (Academic Scoring) was a sequential bottleneck due to synchronous LLM API calls. Parallelizing it with `ThreadPoolExecutor` (3 workers) reduced mock execution time from 5.00s to 2.00s for 5 documents, achieving a 2.5x speedup. Iterating over the list of futures in the order they were submitted is an effective way to preserve document ranking while gaining the benefits of concurrency.
+**Action:** Always look for sequential loops containing network requests (LLM, search, downloads) and consider `ThreadPoolExecutor` for immediate performance gains in I/O-bound stages.
