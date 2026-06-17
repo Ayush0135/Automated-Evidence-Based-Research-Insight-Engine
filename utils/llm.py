@@ -4,6 +4,7 @@ import time
 import google.generativeai as genai
 from groq import Groq
 from anthropic import Anthropic, NotFoundError
+from termcolor import colored
 from dotenv import load_dotenv
 from utils.llm_offline import query_offline_llm
 
@@ -15,8 +16,11 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # Initialize Clients
+gemini_model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+    # Cache model at module level to avoid re-instantiation overhead
+    gemini_model = genai.GenerativeModel('gemini-2.0-flash')
 
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
@@ -24,11 +28,10 @@ anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY els
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not found.")
+    if not GEMINI_API_KEY or not gemini_model:
+        raise ValueError("GEMINI_API_KEY not found or model not initialized.")
     
-    # Updated to gemini-2.0-flash based on available models
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = gemini_model
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -155,7 +158,6 @@ def execute_strategies(strategies, prompt):
              return func(prompt)
         except Exception as e:
             errors.append(str(e))
-            from termcolor import colored
             
             error_msg = str(e)
             if "429" in error_msg or "Rate limit" in error_msg:
