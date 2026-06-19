@@ -1,5 +1,6 @@
 import os
 import requests
+from requests.adapters import HTTPAdapter
 from bs4 import BeautifulSoup
 import io
 import PyPDF2
@@ -9,6 +10,13 @@ load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
+
+# Optimization: Global session for connection pooling
+# This significantly reduces handshake overhead for repeated requests to the same host
+search_session = requests.Session()
+adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20)
+search_session.mount("https://", adapter)
+search_session.mount("http://", adapter)
 
 def google_search(query, num_results=5):
     """
@@ -22,7 +30,7 @@ def google_search(query, num_results=5):
         'num': num_results
     }
     try:
-        response = requests.get(url, params=params)
+        response = search_session.get(url, params=params)
         response.raise_for_status()
         return response.json().get('items', [])
     except Exception as e:
@@ -36,7 +44,7 @@ def download_and_parse(url):
     """
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, headers=headers, timeout=10)
+        response = search_session.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
