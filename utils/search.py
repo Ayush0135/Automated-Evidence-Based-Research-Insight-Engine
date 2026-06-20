@@ -1,5 +1,6 @@
 import os
 import requests
+from requests.adapters import HTTPAdapter
 from bs4 import BeautifulSoup
 import io
 import PyPDF2
@@ -9,6 +10,14 @@ load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
+
+# Bolt Optimization: Connection Pooling
+# Using a global session with an HTTPAdapter reduces latency by reusing TCP/TLS handshakes.
+# pool_maxsize=20 matches the parallel processing limit in Stage 2.
+_search_session = requests.Session()
+_adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
+_search_session.mount("http://", _adapter)
+_search_session.mount("https://", _adapter)
 
 def google_search(query, num_results=5):
     """
@@ -22,7 +31,8 @@ def google_search(query, num_results=5):
         'num': num_results
     }
     try:
-        response = requests.get(url, params=params)
+        # Reusing global session for connection pooling
+        response = _search_session.get(url, params=params)
         response.raise_for_status()
         return response.json().get('items', [])
     except Exception as e:
@@ -36,7 +46,8 @@ def download_and_parse(url):
     """
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, headers=headers, timeout=10)
+        # Reusing global session for connection pooling
+        response = _search_session.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
