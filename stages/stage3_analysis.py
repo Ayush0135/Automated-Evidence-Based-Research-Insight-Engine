@@ -1,6 +1,5 @@
-from utils.llm import query_gemini
+from utils.llm import query_gemini, extract_json
 import json
-import re
 import time
 
 def chunk_text(text, chunk_size=12000, overlap=500):
@@ -22,23 +21,6 @@ def chunk_text(text, chunk_size=12000, overlap=500):
             break
             
     return chunks
-
-def extract_json(text):
-    """
-     robustly extract JSON from text using regex 
-    """
-    try:
-        # Try finding the first { and last }
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
-            json_str = match.group(0)
-            # Remove trailing commas before closing braces/brackets
-            json_str = re.sub(r',\s*\}', '}', json_str)
-            json_str = re.sub(r',\s*\]', ']', json_str)
-            return json.loads(json_str)
-        return None
-    except:
-        return None
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
