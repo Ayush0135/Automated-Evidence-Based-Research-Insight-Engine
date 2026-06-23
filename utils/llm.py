@@ -1,6 +1,8 @@
 
 import os
 import time
+import re
+import json
 import google.generativeai as genai
 from groq import Groq
 from anthropic import Anthropic, NotFoundError
@@ -14,21 +16,42 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+# Pre-compile regex for JSON extraction to improve performance
+JSON_PATTERN = re.compile(r'\{.*\}', re.DOTALL)
+
 # Initialize Clients
+gemini_model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+    # Reuse the same model instance to avoid redundant instantiation overhead
+    gemini_model = genai.GenerativeModel('gemini-2.0-flash')
 
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
+# --- Utilities ---
+
+def extract_json(text):
+    """
+    Robustly extract JSON from text using a pre-compiled regex.
+    """
+    try:
+        match = JSON_PATTERN.search(text)
+        if match:
+            json_str = match.group(0)
+            # Remove trailing commas before closing braces/brackets for better robustness
+            json_str = re.sub(r',\s*\}', '}', json_str)
+            json_str = re.sub(r',\s*\]', ']', json_str)
+            return json.loads(json_str)
+        return None
+    except Exception:
+        return None
+
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not found.")
-    
-    # Updated to gemini-2.0-flash based on available models
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    if not GEMINI_API_KEY or not gemini_model:
+        raise ValueError("Gemini client not properly initialized.")
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -37,7 +60,7 @@ def _call_gemini(prompt):
     
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(prompt)
+            response = gemini_model.generate_content(prompt)
             if not response.text:
                 raise ValueError("Gemini returned empty response.")
             return response.text
