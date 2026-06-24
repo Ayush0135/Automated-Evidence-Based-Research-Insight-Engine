@@ -1,6 +1,4 @@
-from utils.llm import query_stage
-import json
-import re
+from utils.llm import query_stage, extract_json
 
 def stage6_research_synthesis(knowledge_base, topic):
     print("\n--- STAGE 6: ORIGINAL RESEARCH SYNTHESIS ")
@@ -42,18 +40,9 @@ def stage6_research_synthesis(knowledge_base, topic):
     
     # Heavy synthesis using 'synthesis' stage strategy
     response = query_stage("synthesis", prompt)
-    try:
-        # Robust Regex Extraction
-        match = re.search(r'\{.*\}', response, re.DOTALL)
-        if match:
-            json_str = match.group(0)
-            # Use strict=False to allow control characters (newlines in strings)
-            synthesis = json.loads(json_str, strict=False)
-        else:
-            cleaned = response.replace("```json", "").replace("```", "").strip()
-            synthesis = json.loads(cleaned, strict=False)
-            
+    synthesis = extract_json(response)
+    if synthesis:
         return synthesis
-    except Exception as e:
-        print(f"Error in synthesis: {e}")
+    else:
+        print(f"Error in synthesis parsing.")
         return None
