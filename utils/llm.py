@@ -1,6 +1,8 @@
 
 import os
 import time
+import re
+import json
 import google.generativeai as genai
 from groq import Groq
 from anthropic import Anthropic, NotFoundError
@@ -17,6 +19,10 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 # Initialize Clients
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+    # Global model instance for reuse
+    gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+else:
+    gemini_model = None
 
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
@@ -24,11 +30,8 @@ anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY els
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not found.")
-    
-    # Updated to gemini-2.0-flash based on available models
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    if not gemini_model:
+        raise ValueError("GEMINI_API_KEY not found or model init failed.")
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -37,7 +40,7 @@ def _call_gemini(prompt):
     
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(prompt)
+            response = gemini_model.generate_content(prompt)
             if not response.text:
                 raise ValueError("Gemini returned empty response.")
             return response.text
@@ -103,28 +106,63 @@ def _call_anthropic(prompt):
 # Format: "stage_name": ["model_id_1", "model_id_2"]
 # Model IDs can be: 'groq', 'anthropic', 'gemini', or 'ollama:model_name'
 STAGE_CONFIG = {
-    "default": ["groq", "anthropic", "ollama:llama3.2"],
+    "default": ["gemini", "groq", "anthropic", "ollama:llama3.2"],
     
     # Fast, Logic Heavy
-    "topic": ["groq", "anthropic", "ollama:llama3.2"],
+    "topic": ["gemini", "groq", "anthropic", "ollama:llama3.2"],
     
     # Search filtering (High volume, needs speed)
-    "discovery": ["groq", "ollama:llama3.2"], 
+    "discovery": ["gemini", "groq", "ollama:llama3.2"],
     
     # Analysis (Heavy Context, Reasoning)
     "analysis": [
+        "gemini",
         "groq",                      
         "anthropic",                 
         "ollama:llama3.2"      
     ],
     
     # Scoring (FAST, strict formatting)
-    "scoring": ["groq", "ollama:llama3.2"],
+    "scoring": ["gemini", "groq", "ollama:llama3.2"],
     
     # Synthesis & Generation (Creative, high quality)
-    "synthesis": ["anthropic", "groq", "ollama:llama3.2"],
-    "generation": ["anthropic", "groq", "ollama:llama3.2"]
+    "synthesis": ["gemini", "anthropic", "groq", "ollama:llama3.2"],
+    "generation": ["gemini", "anthropic", "groq", "ollama:llama3.2"]
 }
+
+# --- JSON Extraction Helper ---
+
+# Pre-compiled regex patterns for speed and efficiency
+JSON_PATTERN = re.compile(r'[\{\[].*[\}\]]', re.DOTALL)
+CLEAN_COMMA_BRACE = re.compile(r',\s*\}')
+CLEAN_COMMA_BRACKET = re.compile(r',\s*\]')
+
+def extract_json(text):
+    """
+    Robustly extract and clean JSON from LLM response text.
+    Uses pre-compiled regex and handles common LLM formatting errors.
+    """
+    if not text:
+        return None
+
+    try:
+        match = JSON_PATTERN.search(text)
+        if match:
+            json_str = match.group(0)
+            # Remove trailing commas before closing braces/brackets
+            json_str = CLEAN_COMMA_BRACE.sub('}', json_str)
+            json_str = CLEAN_COMMA_BRACKET.sub(']', json_str)
+
+            # Use strict=False to handle potential control characters
+            return json.loads(json_str, strict=False)
+        return None
+    except Exception:
+        # Final fallback: simple string cleaning
+        try:
+            cleaned = text.replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned, strict=False)
+        except:
+            return None
 
 def _resolve_strategy(model_id):
     """

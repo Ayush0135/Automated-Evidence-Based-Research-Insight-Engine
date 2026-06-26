@@ -1,9 +1,9 @@
-from utils.llm import query_gemini
+from utils.llm import query_gemini, extract_json
 import json
 import re
 import time
 
-def chunk_text(text, chunk_size=12000, overlap=500):
+def chunk_text(text, chunk_size=24000, overlap=1000):
     """
     Splits text into overlapping chunks.
     """
@@ -23,23 +23,6 @@ def chunk_text(text, chunk_size=12000, overlap=500):
             
     return chunks
 
-def extract_json(text):
-    """
-     robustly extract JSON from text using regex 
-    """
-    try:
-        # Try finding the first { and last }
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
-            json_str = match.group(0)
-            # Remove trailing commas before closing braces/brackets
-            json_str = re.sub(r',\s*\}', '}', json_str)
-            json_str = re.sub(r',\s*\]', ']', json_str)
-            return json.loads(json_str)
-        return None
-    except:
-        return None
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def analyze_single_document(doc):
@@ -48,9 +31,10 @@ def analyze_single_document(doc):
         full_text = doc['raw_text']
         
         # Strategy Decision: Chunk vs Whole
-        if len(full_text) > 12000:
+        # Increased chunk_size to 24,000 to reduce LLM calls while fitting context
+        if len(full_text) > 24000:
             # print(f"  - Large Doc ({len(full_text)} chars). Chunking...")
-            all_chunks = chunk_text(full_text, chunk_size=12000, overlap=500)
+            all_chunks = chunk_text(full_text, chunk_size=24000, overlap=1000)
             
             # Smart Selection: Limit to max 6 chunks for speed
             if len(all_chunks) > 6:
@@ -122,25 +106,21 @@ def analyze_single_document(doc):
         
         response = query_gemini(prompt, fallback_to_others=False)
         
-        # Robust Parsing
+        # Robust Parsing using centralized helper
         analysis = extract_json(response)
         if not analysis:
-            try:
-                cleaned_response = response.replace("```json", "").replace("```", "")
-                analysis = json.loads(cleaned_response)
-            except:
-                # Fallback: If model text isn't JSON, wrap it anyway so we don't lose the data
-                print(f"  ! Warning: Could not parse JSON for {doc['title'][:15]}. Using raw text fallback.")
-                analysis = {
-                    "research_problem": "JSON Parsing Failed",
-                    "methodology": "See findings",
-                    "key_findings": response if response else "No content returned",
-                    "limitations": "N/A",
-                    "research_gaps": "N/A",
-                    "novelty_assessment": "N/A",
-                    "technical_depth_score": 0,
-                    "missing_entities": "Parsing Failed"
-                }
+            # Fallback: If model text isn't JSON, wrap it anyway so we don't lose the data
+            print(f"  ! Warning: Could not parse JSON for {doc['title'][:15]}. Using raw text fallback.")
+            analysis = {
+                "research_problem": "JSON Parsing Failed",
+                "methodology": "See findings",
+                "key_findings": response if response else "No content returned",
+                "limitations": "N/A",
+                "research_gaps": "N/A",
+                "novelty_assessment": "N/A",
+                "technical_depth_score": 0,
+                "missing_entities": "Parsing Failed"
+            }
         
         doc['analysis'] = analysis
         print(f"  + Analysis Complete: {doc['title'][:30]}...")
