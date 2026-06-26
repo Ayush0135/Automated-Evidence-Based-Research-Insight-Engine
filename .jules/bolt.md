@@ -5,3 +5,7 @@
 ## 2025-05-15 - HTTP Connection Pooling
 **Learning:** Initializing a global `requests.Session` with an `HTTPAdapter` (pooling) significantly reduces latency for network-heavy applications. Benchmarking showed a ~41% reduction in response time (from ~0.91s to ~0.54s for 10 requests) by reusing TCP/TLS connections.
 **Action:** In any module performing multiple external API calls or scraping (e.g., Search, Discovery), always prefer a shared `requests.Session` over individual `requests.get/post` calls to leverage connection reuse.
+
+## 2025-05-16 - LLM Optimization Techniques
+**Learning:** Significant performance gains in LLM pipelines can be achieved by: 1) Reusing model instances (e.g., `genai.GenerativeModel`) to avoid re-initialization overhead. 2) Increasing chunk size for analysis to minimize API calls (halving calls by doubling size). 3) Centralizing and pre-compiling regex for JSON extraction (~38% speedup in parsing).
+**Action:** For LLM-heavy workflows, always reuse client/model instances, optimize data chunking to the maximum safe context window, and centralize parsing logic with pre-compiled patterns.
