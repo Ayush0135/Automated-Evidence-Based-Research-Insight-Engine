@@ -1,6 +1,8 @@
 
 import os
 import time
+import json
+import re
 import google.generativeai as genai
 from groq import Groq
 from anthropic import Anthropic, NotFoundError
@@ -18,17 +20,17 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# Global model instance for Gemini to avoid redundant instantiation overhead
+gemini_model = genai.GenerativeModel('gemini-2.0-flash') if GEMINI_API_KEY else None
+
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not found.")
-    
-    # Updated to gemini-2.0-flash based on available models
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    if not GEMINI_API_KEY or not gemini_model:
+        raise ValueError("GEMINI_API_KEY not found or model not initialized.")
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -37,7 +39,7 @@ def _call_gemini(prompt):
     
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(prompt)
+            response = gemini_model.generate_content(prompt)
             if not response.text:
                 raise ValueError("Gemini returned empty response.")
             return response.text
@@ -207,3 +209,58 @@ def query_gemini(prompt, retries=1, delay=0, fallback_to_others=False):
 
 def query_groq(prompt, json_mode=False, fallback_to_others=True):
     return query_stage("scoring", prompt)
+
+# --- Utilities ---
+
+# Pre-compiled regex for performance
+OBJ_PATTERN = re.compile(r'\{.*\}', re.DOTALL)
+LIST_PATTERN = re.compile(r'\[.*\]', re.DOTALL)
+MD_JSON_PATTERN = re.compile(r'```json\s*(.*?)\s*```', re.DOTALL)
+TRAILING_COMMA_CLEANUP_1 = re.compile(r',\s*\}')
+TRAILING_COMMA_CLEANUP_2 = re.compile(r',\s*\]')
+
+def extract_json(text):
+    """
+    Robustly extract JSON (object or list) from text using pre-compiled regex.
+    Centralized helper for consistency across all pipeline stages.
+    """
+    if not text:
+        return None
+
+    # 1. Try Markdown Code Block first (most specific)
+    md_match = MD_JSON_PATTERN.search(text)
+    if md_match:
+        json_str = md_match.group(1)
+        try:
+            return json.loads(json_str, strict=False)
+        except Exception:
+            # If MD block fails, fall through to raw regex
+            pass
+
+    # 2. Try Object extraction
+    obj_match = OBJ_PATTERN.search(text)
+    if obj_match:
+        json_str = obj_match.group(0)
+        json_str = TRAILING_COMMA_CLEANUP_1.sub('}', json_str)
+        json_str = TRAILING_COMMA_CLEANUP_2.sub(']', json_str)
+        try:
+            return json.loads(json_str, strict=False)
+        except Exception:
+            pass
+
+    # 3. Try List extraction
+    list_match = LIST_PATTERN.search(text)
+    if list_match:
+        json_str = list_match.group(0)
+        json_str = TRAILING_COMMA_CLEANUP_2.sub(']', json_str)
+        try:
+            return json.loads(json_str, strict=False)
+        except Exception:
+            pass
+
+    # 4. Fallback for clean responses without preamble/postamble or if regex failed
+    try:
+        cleaned = text.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(cleaned, strict=False)
+    except Exception:
+        return None

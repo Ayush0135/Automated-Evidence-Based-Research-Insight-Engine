@@ -1,4 +1,4 @@
-from utils.llm import query_groq
+from utils.llm import query_groq, extract_json
 import json
 
 def stage8_review_paper(paper_content, topic):
@@ -30,22 +30,13 @@ def stage8_review_paper(paper_content, topic):
     """
     
     response = query_groq(prompt, json_mode=True, fallback_to_others=True)
-    try:
-        # Robust extraction for offline models that might header/footer text
-        start_idx = response.find('{')
-        end_idx = response.rfind('}')
-        
-        if start_idx != -1 and end_idx != -1:
-            cleaned = response[start_idx:end_idx+1]
-        else:
-            cleaned = response.replace("```json", "").replace("```", "").strip()
-            
-        review = json.loads(cleaned)
+    review = extract_json(response)
+    if review:
         print(f"  Paper Score: {review.get('score')}/10")
         return review
-    except Exception as e:
-        print(f"  Error parsing review: {e}")
-        print(f"  Raw response: {response}")
-        # Return a low score to trigger regeneration if parsing fails, assuming bad generation.
-        return {"score": 4, "critique": "JSON parsing failed. Automatic integrity penalty."}  
+
+    print(f"  Error parsing review.")
+    # print(f"  Raw response: {response}")
+    # Return a low score to trigger regeneration if parsing fails, assuming bad generation.
+    return {"score": 4, "critique": "JSON parsing failed. Automatic integrity penalty."}
         # Previously was returning 0 and "Error ...", which works too.
