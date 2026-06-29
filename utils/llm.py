@@ -3,7 +3,8 @@ import os
 import time
 import re
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import errors
 from groq import Groq
 from anthropic import Anthropic, NotFoundError
 from dotenv import load_dotenv
@@ -17,11 +18,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # Initialize Clients
-gemini_model = None
+gemini_client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # Cache the model instance at the module level to avoid repeated instantiation
-    gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
@@ -29,8 +28,8 @@ anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY els
 # --- Internal Callers ---
 
 def _call_gemini(prompt):
-    if not GEMINI_API_KEY or not gemini_model:
-        raise ValueError("GEMINI_API_KEY not found or model not initialized.")
+    if not GEMINI_API_KEY or not gemini_client:
+        raise ValueError("GEMINI_API_KEY not found or client not initialized.")
     
     # Simple retry logic for ResourceExhausted or other transient errors
     # Reduced retries for faster failover to other models/offline
@@ -39,15 +38,26 @@ def _call_gemini(prompt):
     
     for attempt in range(max_retries):
         try:
-            response = gemini_model.generate_content(prompt)
+            response = gemini_client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt,
+            )
             if not response.text:
                 raise ValueError("Gemini returned empty response.")
             return response.text
-        except Exception as e:
+        except errors.APIError as e:
             # Check if it's a quota error (429/ResourceExhausted)
-            if "429" in str(e) or "ResourceExhausted" in str(e) or "QuotaExceeded" in str(e):
+            if e.code == 429 or "ResourceExhausted" in str(e) or "QuotaExceeded" in str(e):
                 if attempt < max_retries - 1:
                     wait_time = base_delay * (2 ** attempt)  # Exponential backoff: 5s, 10s, 20s
+                    print(f"  [Gemini] Rate limit hit. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+            raise e
+        except Exception as e:
+            if "429" in str(e) or "ResourceExhausted" in str(e) or "QuotaExceeded" in str(e):
+                if attempt < max_retries - 1:
+                    wait_time = base_delay * (2 ** attempt)
                     print(f"  [Gemini] Rate limit hit. Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                     continue
