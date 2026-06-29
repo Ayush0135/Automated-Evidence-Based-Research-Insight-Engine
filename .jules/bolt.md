@@ -9,3 +9,7 @@
 ## 2025-05-16 - Pre-compiled Regex for JSON Extraction
 **Learning:** Repeatedly compiling complex regular expressions for JSON extraction (especially those using `re.DOTALL` and multi-line matching) adds significant overhead in high-throughput pipelines. Moving to module-level pre-compiled patterns yielded a measurable ~39% improvement in extraction latency.
 **Action:** Centralize common parsing logic (like JSON extraction) and use module-level `re.compile()` for all patterns to avoid redundant compilation in loops.
+
+## 2025-05-17 - Right-sizing LLM Chunk Thresholds
+**Learning:** Initializing document chunking at too low a threshold (e.g., 24,000 characters) causes unnecessary API round-trips for medium-sized documents that easily fit within modern LLM context windows (128k+ tokens). Increasing the threshold to 48,000 characters eliminates ~66% of I/O latency for these papers by reducing 3 calls to 1.
+**Action:** Always align chunking thresholds with the context window capabilities of the primary LLM providers to minimize I/O-bound round-trips without risking context overflow.

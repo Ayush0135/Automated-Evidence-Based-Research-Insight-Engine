@@ -3,7 +3,7 @@ import json
 import re
 import time
 
-def chunk_text(text, chunk_size=24000, overlap=1000):
+def chunk_text(text, chunk_size=48000, overlap=1000):
     """
     Splits text into overlapping chunks.
     """
@@ -31,9 +31,10 @@ def analyze_single_document(doc):
         full_text = doc['raw_text']
         
         # Strategy Decision: Chunk vs Whole
-        if len(full_text) > 24000:
+        # Optimization: Increased threshold to 48,000 to reduce LLM calls for medium papers
+        if len(full_text) > 48000:
             # print(f"  - Large Doc ({len(full_text)} chars). Chunking...")
-            all_chunks = chunk_text(full_text, chunk_size=24000, overlap=1000)
+            all_chunks = chunk_text(full_text, chunk_size=48000, overlap=1000)
             
             # Smart Selection: Limit to max 6 chunks for speed
             if len(all_chunks) > 6:
