@@ -1,4 +1,4 @@
-from utils.llm import query_groq
+from utils.llm import query_groq, extract_json
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -43,18 +43,15 @@ def score_single_document(doc, topic):
 
     try:
         response = query_groq(prompt, json_mode=True, fallback_to_others=True)
-        # Robust Extraction
-        match = re.search(r'\{.*\}', response, re.DOTALL)
-        if match:
-            json_str = match.group(0)
-            score_data = json.loads(json_str)
-        else:
-            # Fallback to direct load or primitive cleanup
-            cleaned = response.replace("```json", "").replace("```", "").strip()
-            score_data = json.loads(cleaned)
+        # Robust Extraction using centralized helper
+        score_data = extract_json(response)
 
-        doc['scoring'] = score_data
-        return doc
+        if score_data:
+            doc['scoring'] = score_data
+            return doc
+        else:
+            print(f"  Error parsing score for {doc.get('title')}")
+            return None
     except Exception as e:
         print(f"  Error scoring document {doc.get('title', 'Unknown')}: {e}")
         return None
