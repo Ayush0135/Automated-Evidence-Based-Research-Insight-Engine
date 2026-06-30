@@ -3,7 +3,7 @@ import json
 import re
 import time
 
-def chunk_text(text, chunk_size=24000, overlap=1000):
+def chunk_text(text, chunk_size=48000, overlap=1000):
     """
     Splits text into overlapping chunks.
     """
@@ -26,14 +26,20 @@ def chunk_text(text, chunk_size=24000, overlap=1000):
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def analyze_single_document(doc):
+    """
+    Analyzes a document by extracting key research components.
+    Optimization: Increased chunk size to 48,000 chars to reduce LLM calls
+    for medium-sized academic papers while staying within context limits.
+    """
     try:
         # print(f"Analyzing: {doc['title'][:30]}...")
         full_text = doc['raw_text']
         
         # Strategy Decision: Chunk vs Whole
-        if len(full_text) > 24000:
+        # threshold increased to 48k to minimize overhead
+        if len(full_text) > 48000:
             # print(f"  - Large Doc ({len(full_text)} chars). Chunking...")
-            all_chunks = chunk_text(full_text, chunk_size=24000, overlap=1000)
+            all_chunks = chunk_text(full_text, chunk_size=48000, overlap=1000)
             
             # Smart Selection: Limit to max 6 chunks for speed
             if len(all_chunks) > 6:
@@ -49,7 +55,7 @@ def analyze_single_document(doc):
             def analyze_chunk(idx, chunk):
                 chunk_prompt = f"""
                 Analyze this segment (Part {idx+1}) of "{doc['title']}".
-                Segment: {chunk[:15000]}
+                Segment: {chunk}
                 Task: Extract Research Problem, Methodology, Findings, Limitations.
                 Output: Concise bullet points.
                 """
@@ -66,7 +72,8 @@ def analyze_single_document(doc):
             
             text_context = "\n".join(chunk_summaries)
         else:
-            text_content = full_text[:20000] 
+            # No chunking needed for docs under 48k chars
+            text_content = full_text
             text_context = text_content
 
         prompt = f"""
