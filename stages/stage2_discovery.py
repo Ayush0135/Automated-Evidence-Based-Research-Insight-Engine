@@ -63,8 +63,7 @@ def stage2_document_discovery(decomposition_data):
         print(f"  [Search] Querying: {academic_query}")
         
         try:
-            # Small random delay to stagger requests slightly
-            time.sleep(0.1) 
+            # Removed redundant sleep to speed up parallel search
             search_res = google_search(academic_query, num_results=6) # Reduced from 8 to 6 for speed
             for item in search_res:
                 item['subtopic'] = subtopic['name']

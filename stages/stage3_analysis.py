@@ -3,7 +3,7 @@ import json
 import re
 import time
 
-def chunk_text(text, chunk_size=48000, overlap=1000):
+def chunk_text(text, chunk_size=64000, overlap=1000):
     """
     Splits text into overlapping chunks.
     """
@@ -31,10 +31,10 @@ def analyze_single_document(doc):
         full_text = doc['raw_text']
         
         # Strategy Decision: Chunk vs Whole
-        # Optimization: Increased threshold to 48k to handle typical academic papers in one/fewer calls
-        if len(full_text) > 48000:
+        # Optimization: Increased threshold to 64k to handle larger academic papers in fewer calls
+        if len(full_text) > 64000:
             # print(f"  - Large Doc ({len(full_text)} chars). Chunking...")
-            all_chunks = chunk_text(full_text, chunk_size=48000, overlap=1000)
+            all_chunks = chunk_text(full_text, chunk_size=64000, overlap=1000)
             
             # Smart Selection: Limit to max 6 chunks for speed
             if len(all_chunks) > 6:
@@ -60,15 +60,15 @@ def analyze_single_document(doc):
                     return ""
 
             with ThreadPoolExecutor(max_workers=3) as chunk_executor:
-                futures = [chunk_executor.submit(analyze_chunk, i, c) for i, c in enumerate(selected_chunks)]
-                for f in as_completed(futures):
-                    res = f.result()
-                    if res: chunk_summaries.append(res)
+                # Use executor.map to maintain logical order of chunk summaries
+                indices = range(len(selected_chunks))
+                results = list(chunk_executor.map(analyze_chunk, indices, selected_chunks))
+                chunk_summaries = [res for res in results if res]
             
             text_context = "\n".join(chunk_summaries)
         else:
-            # For documents under the threshold, use up to 48,000 characters
-            text_content = full_text[:48000]
+            # For documents under the threshold, use up to 64,000 characters
+            text_content = full_text[:64000]
             text_context = text_content
 
         prompt = f"""
@@ -136,8 +136,8 @@ def stage3_document_analysis(documents):
     analyzed_documents = []
     
     # Process documents in parallel
-    # max_workers=2 to reduce Rate Limits and Local LLM load
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    # Increased max_workers to 4 for faster document throughput
+    with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_doc = {executor.submit(analyze_single_document, doc): doc for doc in documents}
         
         for future in as_completed(future_to_doc):
