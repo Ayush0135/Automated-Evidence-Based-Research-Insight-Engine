@@ -115,27 +115,28 @@ def _call_anthropic(prompt):
 # Format: "stage_name": ["model_id_1", "model_id_2"]
 # Model IDs can be: 'groq', 'anthropic', 'gemini', or 'ollama:model_name'
 STAGE_CONFIG = {
-    "default": ["groq", "anthropic", "ollama:llama3.2"],
+    "default": ["gemini", "groq", "anthropic", "ollama:llama3.2"],
     
     # Fast, Logic Heavy
-    "topic": ["groq", "anthropic", "ollama:llama3.2"],
+    "topic": ["gemini", "groq", "anthropic", "ollama:llama3.2"],
     
     # Search filtering (High volume, needs speed)
     "discovery": ["groq", "ollama:llama3.2"], 
     
     # Analysis (Heavy Context, Reasoning)
     "analysis": [
+        "gemini",
         "groq",                      
         "anthropic",                 
         "ollama:llama3.2"      
     ],
     
     # Scoring (FAST, strict formatting)
-    "scoring": ["groq", "ollama:llama3.2"],
+    "scoring": ["gemini", "groq", "ollama:llama3.2"],
     
     # Synthesis & Generation (Creative, high quality)
-    "synthesis": ["anthropic", "groq", "ollama:llama3.2"],
-    "generation": ["anthropic", "groq", "ollama:llama3.2"]
+    "synthesis": ["gemini", "anthropic", "groq", "ollama:llama3.2"],
+    "generation": ["gemini", "anthropic", "groq", "ollama:llama3.2"]
 }
 
 def _resolve_strategy(model_id):
