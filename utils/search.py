@@ -18,6 +18,11 @@ adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
 session.mount("http://", adapter)
 session.mount("https://", adapter)
 
+# Optimization: Set default headers once to avoid repeated assignment in the loop
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+})
+
 def google_search(query, num_results=5):
     """
     Performs a Google Custom Search.
@@ -43,8 +48,8 @@ def download_and_parse(url):
     Handles HTML and basic PDF parsing.
     """
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = session.get(url, headers=headers, timeout=10)
+        # Headers are now pre-configured on the session
+        response = session.get(url, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
@@ -53,10 +58,13 @@ def download_and_parse(url):
             try:
                 with io.BytesIO(response.content) as open_pdf_file:
                     reader = PyPDF2.PdfReader(open_pdf_file)
-                    text = ""
+                    # Optimization: Use list comprehension and join for more efficient string building.
+                    # Use walrus operator to call extract_text() only once per page.
+                    text_parts = []
                     for page in reader.pages:
-                        text += page.extract_text() + "\n"
-                    return text
+                        if t := page.extract_text():
+                            text_parts.append(t)
+                    return "\n".join(text_parts)
             except Exception as e:
                 print(f"Error parsing PDF {url}: {e}")
                 return ""
