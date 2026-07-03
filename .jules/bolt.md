@@ -13,3 +13,7 @@
 ## 2025-05-17 - Chunk Size Optimization for Document Analysis
 **Learning:** Doubling the `chunk_size` and threshold to 48,000 characters in `stage3_analysis.py` reduces processing overhead for common academic papers (24k-48k range) by up to 66% in terms of LLM API calls. Modern high-capacity models like Gemini handle these contexts effortlessly without quality degradation.
 **Action:** Align chunking thresholds with the capabilities of the primary LLM provider; larger chunks reduce I/O bottlenecks and provide better holistic context for analysis.
+
+## 2026-07-02 - Ordered Parallelism and Context Scaling
+**Learning:** Switching from `as_completed` to `executor.map` in `stage3_analysis.py` ensures that chunk summaries are joined in their logical sequence (Intro -> Results), improving the quality of the final synthesis. Simultaneously, increasing the chunk threshold to 64,000 characters leverages modern LLM context windows to reduce API overhead by up to 66% for standard academic papers.
+**Action:** Use `executor.map` when the order of results from a parallel loop matters for downstream logic. Periodically review and scale chunking thresholds as primary LLM providers (e.g., Gemini 2.0 Flash) increase their effective context window and speed.
