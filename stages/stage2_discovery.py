@@ -5,39 +5,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def process_search_item(item):
     """
     Helper function to process a single search result:
-    - Filters domains
     - Downloads and parses content
     """
     url = item.get('link')
     title = item.get('title')
-    snippet = item.get('snippet')
     
-    # Filter trivial non-academic URLs (heuristic)
-    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
-    if any(x in url for x in skip_domains):
-        # Silent skip or log if needed
-        return None
-
-    # Efficiency: Relevance Check
-    # Check if keywords from subtopic exist in title or snippet
-    subtopic_name = item.get('subtopic', '')
-    if subtopic_name:
-        # keywords > 3 chars to avoid 'the', 'and', 'for'
-        keywords = [k.lower() for k in subtopic_name.split() if len(k) > 3]
-        text_to_check = (title + " " + snippet).lower()
-        if keywords and not any(k in text_to_check for k in keywords):
-             # print(f"  [Skip] Irrelevant snippet for {subtopic_name}: {title}")
-             return None
-
     try:
         raw_text = download_and_parse(url)
-        if len(raw_text) < 500: # Too short to be a paper
+        if not raw_text or len(raw_text) < 500: # Too short to be a paper
             return None
         
         return {
             "title": title,
             "url": url,
-            "snippet": snippet,
+            "snippet": item.get('snippet'),
             "raw_text": raw_text
         }
     except Exception as e:
@@ -54,6 +35,13 @@ def stage2_document_discovery(decomposition_data):
     if not decomposition_data or 'subtopics' not in decomposition_data:
         print("Invalid input for Stage 2")
         return []
+
+    # Optimization: Pre-calculate subtopic keywords once to avoid redundant computation in the loop
+    subtopic_keywords = {}
+    for subtopic in decomposition_data['subtopics']:
+        name = subtopic['name']
+        # keywords > 3 chars to avoid 'the', 'and', 'for'
+        subtopic_keywords[name] = [k.lower() for k in name.split() if len(k) > 3]
 
     # 1. Gather all candidates concurrently
     def execute_search_query(subtopic, query):
@@ -80,6 +68,8 @@ def stage2_document_discovery(decomposition_data):
 
     print(f"Executing {len(all_queries)} search queries in parallel...")
     
+    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
+
     with ThreadPoolExecutor(max_workers=5) as search_executor:
         future_to_query = {search_executor.submit(execute_search_query, s, q): (s, q) for s, q in all_queries}
         
@@ -87,13 +77,31 @@ def stage2_document_discovery(decomposition_data):
             results = future.result()
             for item in results:
                 url = item.get('link')
-                if url in seen_urls:
+                if not url or url in seen_urls:
                     continue
+
+                # --- Optimization: Upfront Filtering ---
+                # 1. Domain Filter
+                if any(x in url for x in skip_domains):
+                    continue
+
+                # 2. Relevance Check (using pre-calculated keywords)
+                title = item.get('title', '')
+                snippet = item.get('snippet', '')
+                subtopic_name = item.get('subtopic', '')
+                keywords = subtopic_keywords.get(subtopic_name, [])
+
+                if keywords:
+                    text_to_check = (title + " " + snippet).lower()
+                    if not any(k in text_to_check for k in keywords):
+                        # print(f"  [Skip] Irrelevant snippet for {subtopic_name}: {title}")
+                        continue
+
                 seen_urls.add(url)
-                # print(f"    Found: {item.get('title')[:40]}...")
                 search_candidates.append(item)
 
     # Limit to top 20 candidates total (User Constraint)
+    # Optimization: Truncation happens AFTER filtering to maximize the quality of the top 20
     if len(search_candidates) > 20:
         print(f"Limiting candidates from {len(search_candidates)} to top 20.")
         search_candidates = search_candidates[:20]
