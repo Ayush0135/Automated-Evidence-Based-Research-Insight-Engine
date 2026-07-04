@@ -14,6 +14,9 @@ GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 # Initialize a global session for connection pooling
 # This significantly improves performance by reusing TCP/TLS connections
 session = requests.Session()
+# Optimization: Set default User-Agent on the session once to avoid repeated dictionary creation
+session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+
 adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
 session.mount("http://", adapter)
 session.mount("https://", adapter)
@@ -43,8 +46,8 @@ def download_and_parse(url):
     Handles HTML and basic PDF parsing.
     """
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = session.get(url, headers=headers, timeout=10)
+        # Optimization: User-Agent is now handled globally by the session
+        response = session.get(url, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
@@ -53,10 +56,9 @@ def download_and_parse(url):
             try:
                 with io.BytesIO(response.content) as open_pdf_file:
                     reader = PyPDF2.PdfReader(open_pdf_file)
-                    text = ""
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-                    return text
+                    # Optimization: Use "".join() with a generator for faster string synthesis
+                    # and ensure we handle potential None returns from extract_text()
+                    return "\n".join(text for page in reader.pages if (text := page.extract_text()))
             except Exception as e:
                 print(f"Error parsing PDF {url}: {e}")
                 return ""

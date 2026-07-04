@@ -5,30 +5,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def process_search_item(item):
     """
     Helper function to process a single search result:
-    - Filters domains
     - Downloads and parses content
     """
     url = item.get('link')
     title = item.get('title')
-    snippet = item.get('snippet')
+    snippet = item.get('snippet', '')
     
-    # Filter trivial non-academic URLs (heuristic)
-    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
-    if any(x in url for x in skip_domains):
-        # Silent skip or log if needed
-        return None
-
-    # Efficiency: Relevance Check
-    # Check if keywords from subtopic exist in title or snippet
-    subtopic_name = item.get('subtopic', '')
-    if subtopic_name:
-        # keywords > 3 chars to avoid 'the', 'and', 'for'
-        keywords = [k.lower() for k in subtopic_name.split() if len(k) > 3]
-        text_to_check = (title + " " + snippet).lower()
-        if keywords and not any(k in text_to_check for k in keywords):
-             # print(f"  [Skip] Irrelevant snippet for {subtopic_name}: {title}")
-             return None
-
     try:
         raw_text = download_and_parse(url)
         if len(raw_text) < 500: # Too short to be a paper
@@ -56,6 +38,10 @@ def stage2_document_discovery(decomposition_data):
         return []
 
     # 1. Gather all candidates concurrently
+    # Pre-calculate keywords for each subtopic to avoid redundant computation
+    for subtopic in decomposition_data['subtopics']:
+        subtopic['keywords_list'] = [k.lower() for k in subtopic['name'].split() if len(k) > 3]
+
     def execute_search_query(subtopic, query):
         results = []
         # Enforce academic constraints in query
@@ -66,7 +52,7 @@ def stage2_document_discovery(decomposition_data):
             # Removed redundant sleep to speed up parallel search
             search_res = google_search(academic_query, num_results=6) # Reduced from 8 to 6 for speed
             for item in search_res:
-                item['subtopic'] = subtopic['name']
+                item['keywords_list'] = subtopic['keywords_list']
                 results.append(item)
         except Exception as e:
             print(f"    Error querying Google for '{query}': {e}")
@@ -80,6 +66,9 @@ def stage2_document_discovery(decomposition_data):
 
     print(f"Executing {len(all_queries)} search queries in parallel...")
     
+    # Filter trivial non-academic URLs (heuristic)
+    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
+
     with ThreadPoolExecutor(max_workers=5) as search_executor:
         future_to_query = {search_executor.submit(execute_search_query, s, q): (s, q) for s, q in all_queries}
         
@@ -87,10 +76,23 @@ def stage2_document_discovery(decomposition_data):
             results = future.result()
             for item in results:
                 url = item.get('link')
-                if url in seen_urls:
+                if not url or url in seen_urls:
                     continue
+
+                # OPTIMIZATION: Filter domains UPFRONT before truncation
+                if any(x in url for x in skip_domains):
+                    continue
+
+                # OPTIMIZATION: Relevance check UPFRONT before truncation
+                title = item.get('title', '')
+                snippet = item.get('snippet', '')
+                keywords = item.get('keywords_list', [])
+                if keywords:
+                    text_to_check = (title + " " + snippet).lower()
+                    if not any(k in text_to_check for k in keywords):
+                        continue
+
                 seen_urls.add(url)
-                # print(f"    Found: {item.get('title')[:40]}...")
                 search_candidates.append(item)
 
     # Limit to top 20 candidates total (User Constraint)
