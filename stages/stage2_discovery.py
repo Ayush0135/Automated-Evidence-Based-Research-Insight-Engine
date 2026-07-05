@@ -5,30 +5,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def process_search_item(item):
     """
     Helper function to process a single search result:
-    - Filters domains
     - Downloads and parses content
     """
     url = item.get('link')
     title = item.get('title')
     snippet = item.get('snippet')
     
-    # Filter trivial non-academic URLs (heuristic)
-    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
-    if any(x in url for x in skip_domains):
-        # Silent skip or log if needed
-        return None
-
-    # Efficiency: Relevance Check
-    # Check if keywords from subtopic exist in title or snippet
-    subtopic_name = item.get('subtopic', '')
-    if subtopic_name:
-        # keywords > 3 chars to avoid 'the', 'and', 'for'
-        keywords = [k.lower() for k in subtopic_name.split() if len(k) > 3]
-        text_to_check = (title + " " + snippet).lower()
-        if keywords and not any(k in text_to_check for k in keywords):
-             # print(f"  [Skip] Irrelevant snippet for {subtopic_name}: {title}")
-             return None
-
     try:
         raw_text = download_and_parse(url)
         if len(raw_text) < 500: # Too short to be a paper
@@ -72,6 +54,13 @@ def stage2_document_discovery(decomposition_data):
             print(f"    Error querying Google for '{query}': {e}")
         return results
 
+    # 0. Pre-calculate keywords per subtopic to avoid redundant processing in loops
+    subtopic_keywords = {}
+    for subtopic in decomposition_data['subtopics']:
+        name = subtopic['name']
+        # keywords > 3 chars to avoid 'the', 'and', 'for'
+        subtopic_keywords[name] = [k.lower() for k in name.split() if len(k) > 3]
+
     # Flatten all queries
     all_queries = []
     for subtopic in decomposition_data['subtopics']:
@@ -89,6 +78,25 @@ def stage2_document_discovery(decomposition_data):
                 url = item.get('link')
                 if url in seen_urls:
                     continue
+
+                # Performance Optimization: Filter domains and relevance BEFORE adding to candidates
+                # This ensures the 20 slots for parallel downloading are filled with high-quality papers
+
+                # 1. Domain Filter
+                skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
+                if any(x in url for x in skip_domains):
+                    continue
+
+                # 2. Relevance Check (using pre-calculated keywords)
+                subtopic_name = item.get('subtopic', '')
+                keywords = subtopic_keywords.get(subtopic_name, [])
+                if keywords:
+                    title = item.get('title', '')
+                    snippet = item.get('snippet', '')
+                    text_to_check = (title + " " + snippet).lower()
+                    if not any(k in text_to_check for k in keywords):
+                        continue
+
                 seen_urls.add(url)
                 # print(f"    Found: {item.get('title')[:40]}...")
                 search_candidates.append(item)
@@ -101,8 +109,8 @@ def stage2_document_discovery(decomposition_data):
     print(f"\nDownloading and parsing {len(search_candidates)} candidates in parallel...")
 
     # 2. Process downloads in parallel
-    # max_workers=5 is a safe number to not overwhelm network or get IP blocked
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # max_workers=10 leverages connection pooling while remaining safe from IP blocks
+    with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
         
         for future in as_completed(future_to_item):
