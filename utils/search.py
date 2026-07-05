@@ -53,10 +53,9 @@ def download_and_parse(url):
             try:
                 with io.BytesIO(response.content) as open_pdf_file:
                     reader = PyPDF2.PdfReader(open_pdf_file)
-                    text = ""
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-                    return text
+                    # Optimized text synthesis: Use list and join instead of repeated +=
+                    text_parts = [page.extract_text() for page in reader.pages]
+                    return "\n".join(filter(None, text_parts))
             except Exception as e:
                 print(f"Error parsing PDF {url}: {e}")
                 return ""
