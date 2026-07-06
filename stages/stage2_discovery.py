@@ -5,29 +5,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def process_search_item(item):
     """
     Helper function to process a single search result:
-    - Filters domains
     - Downloads and parses content
     """
     url = item.get('link')
     title = item.get('title')
     snippet = item.get('snippet')
     
-    # Filter trivial non-academic URLs (heuristic)
-    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
-    if any(x in url for x in skip_domains):
-        # Silent skip or log if needed
-        return None
-
-    # Efficiency: Relevance Check
-    # Check if keywords from subtopic exist in title or snippet
-    subtopic_name = item.get('subtopic', '')
-    if subtopic_name:
-        # keywords > 3 chars to avoid 'the', 'and', 'for'
-        keywords = [k.lower() for k in subtopic_name.split() if len(k) > 3]
-        text_to_check = (title + " " + snippet).lower()
-        if keywords and not any(k in text_to_check for k in keywords):
-             # print(f"  [Skip] Irrelevant snippet for {subtopic_name}: {title}")
-             return None
+    # Filtering moved to stage2_document_discovery for efficiency
 
     try:
         raw_text = download_and_parse(url)
@@ -72,6 +56,12 @@ def stage2_document_discovery(decomposition_data):
             print(f"    Error querying Google for '{query}': {e}")
         return results
 
+    # Pre-calculate keywords for each subtopic to avoid redundant processing
+    subtopic_keywords = {}
+    for subtopic in decomposition_data['subtopics']:
+        name = subtopic['name']
+        subtopic_keywords[name] = [k.lower() for k in name.split() if len(k) > 3]
+
     # Flatten all queries
     all_queries = []
     for subtopic in decomposition_data['subtopics']:
@@ -80,6 +70,9 @@ def stage2_document_discovery(decomposition_data):
 
     print(f"Executing {len(all_queries)} search queries in parallel...")
     
+    # Heuristic domain filter for non-academic sources
+    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
+
     with ThreadPoolExecutor(max_workers=5) as search_executor:
         future_to_query = {search_executor.submit(execute_search_query, s, q): (s, q) for s, q in all_queries}
         
@@ -89,20 +82,35 @@ def stage2_document_discovery(decomposition_data):
                 url = item.get('link')
                 if url in seen_urls:
                     continue
+
+                # OPTIMIZATION: Early filtering before truncation to ensure high-quality candidates
+                # 1. Domain Filter
+                if any(x in url for x in skip_domains):
+                    continue
+
+                # 2. Relevance Check
+                subtopic_name = item.get('subtopic', '')
+                keywords = subtopic_keywords.get(subtopic_name, [])
+                if keywords:
+                    text_to_check = (item.get('title', '') + " " + item.get('snippet', '')).lower()
+                    if not any(k in text_to_check for k in keywords):
+                        continue
+
                 seen_urls.add(url)
                 # print(f"    Found: {item.get('title')[:40]}...")
                 search_candidates.append(item)
 
     # Limit to top 20 candidates total (User Constraint)
+    # Truncation happens AFTER filtering to maximize the yield of the 20 slots
     if len(search_candidates) > 20:
-        print(f"Limiting candidates from {len(search_candidates)} to top 20.")
+        print(f"Limiting filtered candidates from {len(search_candidates)} to top 20.")
         search_candidates = search_candidates[:20]
 
     print(f"\nDownloading and parsing {len(search_candidates)} candidates in parallel...")
 
     # 2. Process downloads in parallel
-    # max_workers=5 is a safe number to not overwhelm network or get IP blocked
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # Increased max_workers to 10 to better leverage connection pooling and session capacity
+    with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
         
         for future in as_completed(future_to_item):
