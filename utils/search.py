@@ -14,6 +14,10 @@ GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 # Initialize a global session for connection pooling
 # This significantly improves performance by reusing TCP/TLS connections
 session = requests.Session()
+# Set default headers on the session to avoid redundant dictionary creation in every request
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+})
 adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
 session.mount("http://", adapter)
 session.mount("https://", adapter)
@@ -30,7 +34,8 @@ def google_search(query, num_results=5):
         'num': num_results
     }
     try:
-        response = session.get(url, params=params)
+        # Added timeout for robustness
+        response = session.get(url, params=params, timeout=10)
         response.raise_for_status()
         return response.json().get('items', [])
     except Exception as e:
@@ -43,8 +48,8 @@ def download_and_parse(url):
     Handles HTML and basic PDF parsing.
     """
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = session.get(url, headers=headers, timeout=10)
+        # headers already set on session
+        response = session.get(url, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
@@ -53,10 +58,8 @@ def download_and_parse(url):
             try:
                 with io.BytesIO(response.content) as open_pdf_file:
                     reader = PyPDF2.PdfReader(open_pdf_file)
-                    text = ""
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-                    return text
+                    # Use "".join for more efficient string synthesis
+                    return "\n".join(filter(None, (page.extract_text() for page in reader.pages)))
             except Exception as e:
                 print(f"Error parsing PDF {url}: {e}")
                 return ""
