@@ -5,30 +5,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 def process_search_item(item):
     """
     Helper function to process a single search result:
-    - Filters domains
-    - Downloads and parses content
+    Downloads and parses content.
+    (Note: Domain filtering and relevance checks are now performed upfront)
     """
     url = item.get('link')
     title = item.get('title')
     snippet = item.get('snippet')
     
-    # Filter trivial non-academic URLs (heuristic)
-    skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
-    if any(x in url for x in skip_domains):
-        # Silent skip or log if needed
-        return None
-
-    # Efficiency: Relevance Check
-    # Check if keywords from subtopic exist in title or snippet
-    subtopic_name = item.get('subtopic', '')
-    if subtopic_name:
-        # keywords > 3 chars to avoid 'the', 'and', 'for'
-        keywords = [k.lower() for k in subtopic_name.split() if len(k) > 3]
-        text_to_check = (title + " " + snippet).lower()
-        if keywords and not any(k in text_to_check for k in keywords):
-             # print(f"  [Skip] Irrelevant snippet for {subtopic_name}: {title}")
-             return None
-
     try:
         raw_text = download_and_parse(url)
         if len(raw_text) < 500: # Too short to be a paper
@@ -67,14 +50,17 @@ def stage2_document_discovery(decomposition_data):
             search_res = google_search(academic_query, num_results=6) # Reduced from 8 to 6 for speed
             for item in search_res:
                 item['subtopic'] = subtopic['name']
+                item['keywords'] = subtopic['processed_keywords']
                 results.append(item)
         except Exception as e:
             print(f"    Error querying Google for '{query}': {e}")
         return results
 
-    # Flatten all queries
+    # Flatten all queries and pre-calculate keywords for efficiency
     all_queries = []
     for subtopic in decomposition_data['subtopics']:
+        # keywords > 3 chars to avoid 'the', 'and', 'for'
+        subtopic['processed_keywords'] = [k.lower() for k in subtopic.get('name', '').split() if len(k) > 3]
         for query in subtopic['search_queries']:
             all_queries.append((subtopic, query))
 
@@ -89,6 +75,20 @@ def stage2_document_discovery(decomposition_data):
                 url = item.get('link')
                 if url in seen_urls:
                     continue
+
+                # Upfront Filtering (Heuristic)
+                skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
+                if any(x in url for x in skip_domains):
+                    continue
+
+                # Relevance Check using pre-calculated keywords
+                keywords = item.get('keywords', [])
+                title = item.get('title', '')
+                snippet = item.get('snippet', '')
+                text_to_check = (title + " " + snippet).lower()
+                if keywords and not any(k in text_to_check for k in keywords):
+                    continue
+
                 seen_urls.add(url)
                 # print(f"    Found: {item.get('title')[:40]}...")
                 search_candidates.append(item)
@@ -101,8 +101,8 @@ def stage2_document_discovery(decomposition_data):
     print(f"\nDownloading and parsing {len(search_candidates)} candidates in parallel...")
 
     # 2. Process downloads in parallel
-    # max_workers=5 is a safe number to not overwhelm network or get IP blocked
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # Increased max_workers to 10 to better utilize the global connection pool (size 20)
+    with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
         
         for future in as_completed(future_to_item):
