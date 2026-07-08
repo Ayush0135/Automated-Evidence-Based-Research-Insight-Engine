@@ -17,6 +17,8 @@ session = requests.Session()
 adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
 session.mount("http://", adapter)
 session.mount("https://", adapter)
+# Set a default User-Agent for all requests in this session
+session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
 
 def google_search(query, num_results=5):
     """
@@ -30,7 +32,8 @@ def google_search(query, num_results=5):
         'num': num_results
     }
     try:
-        response = session.get(url, params=params)
+        # Added 10s timeout to prevent hanging on slow Google API responses
+        response = session.get(url, params=params, timeout=10)
         response.raise_for_status()
         return response.json().get('items', [])
     except Exception as e:
@@ -43,8 +46,7 @@ def download_and_parse(url):
     Handles HTML and basic PDF parsing.
     """
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = session.get(url, headers=headers, timeout=10)
+        response = session.get(url, timeout=10)
         response.raise_for_status()
         
         content_type = response.headers.get('Content-Type', '').lower()
@@ -53,10 +55,8 @@ def download_and_parse(url):
             try:
                 with io.BytesIO(response.content) as open_pdf_file:
                     reader = PyPDF2.PdfReader(open_pdf_file)
-                    text = ""
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-                    return text
+                    # Use list joining for O(n) string building instead of O(n^2) concatenation
+                    return "\n".join(filter(None, (page.extract_text() for page in reader.pages)))
             except Exception as e:
                 print(f"Error parsing PDF {url}: {e}")
                 return ""

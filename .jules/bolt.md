@@ -17,3 +17,7 @@
 ## 2026-07-02 - Ordered Parallelism and Context Scaling
 **Learning:** Switching from `as_completed` to `executor.map` in `stage3_analysis.py` ensures that chunk summaries are joined in their logical sequence (Intro -> Results), improving the quality of the final synthesis. Simultaneously, increasing the chunk threshold to 64,000 characters leverages modern LLM context windows to reduce API overhead by up to 66% for standard academic papers.
 **Action:** Use `executor.map` when the order of results from a parallel loop matters for downstream logic. Periodically review and scale chunking thresholds as primary LLM providers (e.g., Gemini 2.0 Flash) increase their effective context window and speed.
+
+## 2026-07-03 - Upfront Filtering and Selection Optimization
+**Learning:** Performing domain filtering and relevance checking *after* result truncation leads to sub-optimal throughput, as "dead" slots are not backfilled. Moving these filters upfront in Stage 2 ensured that the 20 slots for parallel downloading are always occupied by the highest-quality candidates, rather than being discarded late in the pipeline.
+**Action:** Always apply deterministic filters (domain lists, keyword matching, deduplication) before truncating candidate lists for expensive downstream operations (downloads, LLM analysis).
