@@ -1,6 +1,10 @@
 def stage5_selection_filtering(scored_documents):
     print("\n--- STAGE 5: SELECTION & FILTERING ---")
     
+    # Sort by score descending to ensure best papers are kept during deduplication
+    # and prioritized for the final knowledge base.
+    scored_documents.sort(key=lambda x: x.get('scoring', {}).get('score', 0), reverse=True)
+
     high_quality_docs = []
     seen_titles = set()
     
@@ -19,6 +23,12 @@ def stage5_selection_filtering(scored_documents):
         seen_titles.add(title)
         high_quality_docs.append(doc)
         
+    # Limit to top 10 unique high-quality documents to reduce downstream latency
+    # and stay within optimal LLM context windows.
+    if len(high_quality_docs) > 10:
+        print(f"Limiting from {len(high_quality_docs)} to top 10 unique high-quality documents.")
+        high_quality_docs = high_quality_docs[:10]
+
     print(f"Retained {len(high_quality_docs)} high-quality documents.")
     
     # "Merge complementary insights into a unified knowledge base"
