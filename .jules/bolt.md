@@ -21,3 +21,7 @@
 ## 2026-07-03 - Upfront Filtering and Selection Optimization
 **Learning:** Performing domain filtering and relevance checking *after* result truncation leads to sub-optimal throughput, as "dead" slots are not backfilled. Moving these filters upfront in Stage 2 ensured that the 20 slots for parallel downloading are always occupied by the highest-quality candidates, rather than being discarded late in the pipeline.
 **Action:** Always apply deterministic filters (domain lists, keyword matching, deduplication) before truncating candidate lists for expensive downstream operations (downloads, LLM analysis).
+
+## 2026-07-04 - Downstream Throughput Optimization via Knowledge Base Truncation
+**Learning:** In LLM-driven pipelines, the size of the "Knowledge Base" (the set of analyzed papers) directly determines the latency and token cost of subsequent synthesis and generation stages. Processing an unbounded number of documents (even if high-quality) leads to diminishing returns and potential context window overflow.
+**Action:** Always sort the analyzed/scored candidates by quality (score) and truncate the knowledge base to a fixed size (e.g., top 10) before passing it to heavy synthesis stages. This ensures the highest quality results while maintaining consistent, predictable performance.
