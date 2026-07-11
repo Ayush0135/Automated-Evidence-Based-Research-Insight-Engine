@@ -1,37 +1,46 @@
 def stage5_selection_filtering(scored_documents):
+    """
+    Optimized selection and filtering:
+    1. Sorts by score descending to prioritize quality.
+    2. Limits to top 10 unique documents to minimize downstream LLM context/latency.
+    3. Exits early when score falls below 7.0 or limit is reached.
+    """
     print("\n--- STAGE 5: SELECTION & FILTERING ---")
     
-    high_quality_docs = []
+    # Sort by score descending upfront so we can exit early
+    scored_documents.sort(key=lambda x: x.get('scoring', {}).get('score', 0), reverse=True)
+
+    knowledge_base = []
     seen_titles = set()
     
     for doc in scored_documents:
+        # Stop if we have enough high-quality documents
+        if len(knowledge_base) >= 10:
+            break
+
         score = doc.get('scoring', {}).get('score', 0)
-        title = doc.get('title', '').lower()
         
+        # Stop early if the score falls below the threshold (since list is sorted)
         if score < 7:
-            print(f"Discarding: {title[:30]}... (Score: {score})")
+            break
+            
+        title = doc.get('title', '')
+        clean_title = title.lower().strip()
+
+        if clean_title in seen_titles:
+            # print(f"Discarding duplicate: {clean_title[:30]}")
             continue
             
-        if title in seen_titles:
-            print(f"Discarding duplicate: {title[:30]}")
-            continue
-            
-        seen_titles.add(title)
-        high_quality_docs.append(doc)
+        seen_titles.add(clean_title)
         
-    print(f"Retained {len(high_quality_docs)} high-quality documents.")
-    
-    # "Merge complementary insights into a unified knowledge base"
-    # We will compile the analysis fields into a single context object for the next stage.
-    knowledge_base = []
-    for doc in high_quality_docs:
-        entry = {
-            "source_title": doc['title'],
-            "url": doc['url'],
-            "analysis": doc['analysis'],
-            "strengths": doc['scoring'].get('strengths'),
-            "weaknesses": doc['scoring'].get('weaknesses')
-        }
-        knowledge_base.append(entry)
+        # Build knowledge base entry in-place
+        knowledge_base.append({
+            "source_title": title,
+            "url": doc.get('url'),
+            "analysis": doc.get('analysis'),
+            "strengths": doc.get('scoring', {}).get('strengths'),
+            "weaknesses": doc.get('scoring', {}).get('weaknesses')
+        })
         
+    print(f"Retained {len(knowledge_base)} high-quality documents for synthesis.")
     return knowledge_base

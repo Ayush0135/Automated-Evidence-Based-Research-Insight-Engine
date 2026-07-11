@@ -21,3 +21,7 @@
 ## 2026-07-03 - Upfront Filtering and Selection Optimization
 **Learning:** Performing domain filtering and relevance checking *after* result truncation leads to sub-optimal throughput, as "dead" slots are not backfilled. Moving these filters upfront in Stage 2 ensured that the 20 slots for parallel downloading are always occupied by the highest-quality candidates, rather than being discarded late in the pipeline.
 **Action:** Always apply deterministic filters (domain lists, keyword matching, deduplication) before truncating candidate lists for expensive downstream operations (downloads, LLM analysis).
+
+## 2026-07-04 - Early Exit and Quality-First Selection in Filtering
+**Learning:** In pipelines where downstream stages involve high-latency LLM calls (e.g., Synthesis, Generation), the size and quality of the input knowledge base are critical. Sorting candidates by score upfront allows for an "early exit" strategy once a score threshold or document limit is reached. This prevents redundant processing of low-quality data and ensures a compact, high-value payload for the rest of the pipeline.
+**Action:** Implement sort-and-slice logic with early termination in filtering stages to minimize downstream I/O and context window usage without sacrificing quality.
