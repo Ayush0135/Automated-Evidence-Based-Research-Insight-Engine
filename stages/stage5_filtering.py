@@ -1,30 +1,35 @@
 def stage5_selection_filtering(scored_documents):
+    """
+    Filters and sorts scored documents to create a high-quality knowledge base.
+    Optimized to sort by score, limit to 10 docs, and use a single pass for efficiency.
+    """
     print("\n--- STAGE 5: SELECTION & FILTERING ---")
     
-    high_quality_docs = []
+    # Optimization: Sort by score descending upfront to prioritize highest quality
+    # and allow for early exit. Using sorted() to avoid side-effects on input and support iterables.
+    sorted_docs = sorted(scored_documents, key=lambda x: x.get('scoring', {}).get('score', 0), reverse=True)
+
+    knowledge_base = []
     seen_titles = set()
     
-    for doc in scored_documents:
+    for doc in sorted_docs:
+        # Early exit if we already have 10 high-quality documents
+        if len(knowledge_base) >= 10:
+            break
+
         score = doc.get('scoring', {}).get('score', 0)
         title = doc.get('title', '').lower()
         
+        # Early exit: Since we sorted, all subsequent documents will have score <= current
         if score < 7:
-            print(f"Discarding: {title[:30]}... (Score: {score})")
-            continue
+            break
             
         if title in seen_titles:
-            print(f"Discarding duplicate: {title[:30]}")
             continue
             
         seen_titles.add(title)
-        high_quality_docs.append(doc)
         
-    print(f"Retained {len(high_quality_docs)} high-quality documents.")
-    
-    # "Merge complementary insights into a unified knowledge base"
-    # We will compile the analysis fields into a single context object for the next stage.
-    knowledge_base = []
-    for doc in high_quality_docs:
+        # Optimization: Build the knowledge base entry in the same pass
         entry = {
             "source_title": doc['title'],
             "url": doc['url'],
@@ -34,4 +39,5 @@ def stage5_selection_filtering(scored_documents):
         }
         knowledge_base.append(entry)
         
+    print(f"Retained {len(knowledge_base)} high-quality documents.")
     return knowledge_base
