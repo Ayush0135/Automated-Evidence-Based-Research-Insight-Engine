@@ -56,10 +56,11 @@ def stage3b_deepen_research(analyzed_docs, topic):
 
     # 3. Construct a fake 'decomposition' structure for Stage 2
     # Stage 2 expects: {'subtopics': [{'name': 'Deep Dive', 'search_queries': [...]}]}
+    # Optimization: Include topic keywords in subtopic name to ensure relevance filter passes high-quality results.
     deep_decomposition = {
         'subtopics': [
             {
-                'name': 'Deep Dive Refinement',
+                'name': f"Deep Dive: {topic}",
                 'search_queries': new_queries_list
             }
         ]
@@ -67,7 +68,15 @@ def stage3b_deepen_research(analyzed_docs, topic):
     
     # 4. Run Stage 2 & 3 recursively
     print("  Executing Recursive Search...")
-    new_raw_docs = stage2_document_discovery(deep_decomposition)
+    # Optimization: Pass already seen URLs and titles to avoid redundant downloads
+    existing_urls = [d['url'] for d in analyzed_docs]
+    existing_titles = [d.get('title', '').lower().strip() for d in analyzed_docs]
+
+    new_raw_docs = stage2_document_discovery(
+        deep_decomposition,
+        existing_urls=existing_urls,
+        existing_titles=existing_titles
+    )
     
     if not new_raw_docs:
         print("  No new documents found in deep dive.")

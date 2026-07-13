@@ -25,3 +25,7 @@
 ## 2026-07-04 - Selection Sorting and Early Exit for Knowledge Bases
 **Learning:** Sorting candidates by quality score *before* filtering and transformation allows for an early exit once a predefined high-quality threshold (e.g., 10 documents) is met or when scores drop below a target value. This not only speeds up the filtering stage itself but significantly reduces latency in downstream LLM-heavy synthesis stages by ensuring a compact, high-quality knowledge base.
 **Action:** When filtering many items down to a "best-of" list, always sort by the primary quality metric first to enable early exit and prioritize the most relevant data.
+
+## 2026-07-05 - Cross-Stage Deduplication for Recursive Research
+**Learning:** In recursive pipelines where a second round of discovery is triggered based on initial findings, failing to share "seen" state across stages leads to redundant downloads and LLM analysis of the same documents. Implementing cross-stage deduplication by passing processed URLs/titles to subsequent discovery rounds preserves the candidate processing budget (e.g., 20 documents) for entirely new information.
+**Action:** When calling a discovery or analysis stage recursively or sequentially with overlapping search spaces, always pass a collection of already-processed identifiers to ensure the pipeline focuses on novel data.
