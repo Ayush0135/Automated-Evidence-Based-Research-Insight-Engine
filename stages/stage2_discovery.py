@@ -26,12 +26,12 @@ def process_search_item(item):
         print(f"Error processing {url}: {e}")
         return None
 
-def stage2_document_discovery(decomposition_data):
+def stage2_document_discovery(decomposition_data, seen_urls=None, seen_titles=None):
     print("\n--- STAGE 2: DOCUMENT DISCOVERY ---")
     
     all_documents = []
-    seen_urls = set()
-    seen_titles = set()
+    seen_urls = seen_urls if seen_urls is not None else set()
+    seen_titles = seen_titles if seen_titles is not None else set()
     search_candidates = []
     skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
     
