@@ -67,7 +67,12 @@ def stage3b_deepen_research(analyzed_docs, topic):
     
     # 4. Run Stage 2 & 3 recursively
     print("  Executing Recursive Search...")
-    new_raw_docs = stage2_document_discovery(deep_decomposition)
+
+    # Extract already seen URLs and titles for cross-stage deduplication
+    seen_urls = {d['url'] for d in analyzed_docs if 'url' in d}
+    seen_titles = {d['title'].lower().strip() for d in analyzed_docs if 'title' in d}
+
+    new_raw_docs = stage2_document_discovery(deep_decomposition, seen_urls=seen_urls, seen_titles=seen_titles)
     
     if not new_raw_docs:
         print("  No new documents found in deep dive.")
