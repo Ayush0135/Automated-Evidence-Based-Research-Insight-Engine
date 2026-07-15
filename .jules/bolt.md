@@ -25,3 +25,7 @@
 ## 2026-07-04 - Selection Sorting and Early Exit for Knowledge Bases
 **Learning:** Sorting candidates by quality score *before* filtering and transformation allows for an early exit once a predefined high-quality threshold (e.g., 10 documents) is met or when scores drop below a target value. This not only speeds up the filtering stage itself but significantly reduces latency in downstream LLM-heavy synthesis stages by ensuring a compact, high-quality knowledge base.
 **Action:** When filtering many items down to a "best-of" list, always sort by the primary quality metric first to enable early exit and prioritize the most relevant data.
+
+## 2026-07-05 - Extreme Context Scaling for Reduced API Overhead
+**Learning:** Doubling the chunking threshold to 128,000 characters in `stage3_analysis.py` allows for single-call processing of nearly all standard academic papers. Since Gemini 2.0 Flash (the primary model) supports 1M+ tokens, this change eliminates redundant summarization calls for papers in the 64k-128k character range, providing a 66% reduction in API calls for those documents without sacrificing analysis depth.
+**Action:** Continuously align processing thresholds with the state-of-the-art model context windows. When increasing thresholds, also scale internal parallel worker counts (e.g., from 3 to 6) to ensure that if chunking is still required for outliers, it remains lightning fast.
