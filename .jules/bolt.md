@@ -25,3 +25,7 @@
 ## 2026-07-04 - Selection Sorting and Early Exit for Knowledge Bases
 **Learning:** Sorting candidates by quality score *before* filtering and transformation allows for an early exit once a predefined high-quality threshold (e.g., 10 documents) is met or when scores drop below a target value. This not only speeds up the filtering stage itself but significantly reduces latency in downstream LLM-heavy synthesis stages by ensuring a compact, high-quality knowledge base.
 **Action:** When filtering many items down to a "best-of" list, always sort by the primary quality metric first to enable early exit and prioritize the most relevant data.
+
+## 2026-07-16 - Context Window Optimization and Thread Matching
+**Learning:** Increasing the analysis threshold and chunk size to 128,000 characters allows the majority of academic papers to be processed in a single LLM call. This drastically reduces the latency associated with chunking and synthesis for documents in the 64k-128k range. Furthermore, aligning the download thread count (20) with the connection pool size (20) eliminates thread-level bottlenecks while remaining within the optimized network stack's capacity.
+**Action:** Always align processing thresholds with the specific capabilities of the target LLM (e.g., Gemini 2.0 Flash's 1M+ context) and match concurrency settings to downstream resource limits (like HTTP connection pools) to maximize throughput.
