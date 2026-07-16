@@ -114,8 +114,8 @@ def stage2_document_discovery(decomposition_data):
     print(f"\nDownloading and parsing {len(search_candidates)} candidates in parallel...")
 
     # 2. Process downloads in parallel
-    # Increased max_workers to 10 to better utilize connection pooling (up to 20)
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    # Increased max_workers to 20 to fully utilize connection pooling (up to 20)
+    with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_item = {executor.submit(process_search_item, item): item for item in search_candidates}
         
         for future in as_completed(future_to_item):
