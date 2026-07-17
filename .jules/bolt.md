@@ -25,3 +25,7 @@
 ## 2026-07-04 - Selection Sorting and Early Exit for Knowledge Bases
 **Learning:** Sorting candidates by quality score *before* filtering and transformation allows for an early exit once a predefined high-quality threshold (e.g., 10 documents) is met or when scores drop below a target value. This not only speeds up the filtering stage itself but significantly reduces latency in downstream LLM-heavy synthesis stages by ensuring a compact, high-quality knowledge base.
 **Action:** When filtering many items down to a "best-of" list, always sort by the primary quality metric first to enable early exit and prioritize the most relevant data.
+
+## 2026-07-05 - Cross-Stage Deduplication and High-Context Thresholding
+**Learning:** Recursive execution chains (such as Stage 3b Deepen Research) that invoke previous stages (Stage 2 Discovery) can introduce massive redundancies if state is not shared, leading to duplicate resource downloads and redundant LLM analyses. Furthermore, keeping chunk size thresholds too low ignores the high capacity of modern LLMs (like Gemini 2.0 Flash) and creates unnecessary chunk-by-chunk API calls.
+**Action:** Always propagate already-processed identifiers (URLs and titles) across recursive stage boundaries to enable cross-stage deduplication. Align chunk size thresholds (e.g. 128,000 characters) with high-context API capabilities to process most documents in a single efficient call.
