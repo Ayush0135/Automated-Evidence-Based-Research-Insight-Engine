@@ -26,12 +26,17 @@ def process_search_item(item):
         print(f"Error processing {url}: {e}")
         return None
 
-def stage2_document_discovery(decomposition_data):
+def stage2_document_discovery(decomposition_data, existing_urls=None, existing_titles=None):
+    """
+    Finds academic papers and documents based on the decomposition subtopics and queries.
+    Supports cross-stage deduplication by passing already-processed existing_urls and existing_titles.
+    """
     print("\n--- STAGE 2: DOCUMENT DISCOVERY ---")
     
     all_documents = []
-    seen_urls = set()
-    seen_titles = set()
+    # Initialize seen sets with existing documents from previous stages to prevent duplicate downloads and processing
+    seen_urls = set(existing_urls) if existing_urls else set()
+    seen_titles = set(existing_titles) if existing_titles else set()
     search_candidates = []
     skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
     

@@ -3,9 +3,10 @@ import json
 import re
 import time
 
-def chunk_text(text, chunk_size=64000, overlap=1000):
+def chunk_text(text, chunk_size=128000, overlap=2000):
     """
     Splits text into overlapping chunks.
+    Optimized to use 128,000 character chunks to align with modern LLM high context limits.
     """
     chunks = []
     start = 0
@@ -31,10 +32,11 @@ def analyze_single_document(doc):
         full_text = doc['raw_text']
         
         # Strategy Decision: Chunk vs Whole
-        # Optimization: Increased threshold to 64k to handle larger academic papers in fewer calls
-        if len(full_text) > 64000:
+        # Optimization: Increased threshold to 128,000 characters to handle academic papers in a single call,
+        # reducing parallel chunk analysis overhead and API latency.
+        if len(full_text) > 128000:
             # print(f"  - Large Doc ({len(full_text)} chars). Chunking...")
-            all_chunks = chunk_text(full_text, chunk_size=64000, overlap=1000)
+            all_chunks = chunk_text(full_text, chunk_size=128000, overlap=2000)
             
             # Smart Selection: Limit to max 6 chunks for speed
             if len(all_chunks) > 6:
@@ -67,8 +69,8 @@ def analyze_single_document(doc):
             
             text_context = "\n".join(chunk_summaries)
         else:
-            # For documents under the threshold, use up to 64,000 characters
-            text_content = full_text[:64000]
+            # For documents under the threshold, use up to 128,000 characters
+            text_content = full_text[:128000]
             text_context = text_content
 
         prompt = f"""
