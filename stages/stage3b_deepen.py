@@ -59,7 +59,7 @@ def stage3b_deepen_research(analyzed_docs, topic):
     deep_decomposition = {
         'subtopics': [
             {
-                'name': 'Deep Dive Refinement',
+                'name': f'Deep Dive: {topic}',
                 'search_queries': new_queries_list
             }
         ]
