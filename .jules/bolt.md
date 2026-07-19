@@ -25,3 +25,7 @@
 ## 2026-07-04 - Selection Sorting and Early Exit for Knowledge Bases
 **Learning:** Sorting candidates by quality score *before* filtering and transformation allows for an early exit once a predefined high-quality threshold (e.g., 10 documents) is met or when scores drop below a target value. This not only speeds up the filtering stage itself but significantly reduces latency in downstream LLM-heavy synthesis stages by ensuring a compact, high-quality knowledge base.
 **Action:** When filtering many items down to a "best-of" list, always sort by the primary quality metric first to enable early exit and prioritize the most relevant data.
+
+## 2026-07-05 - Cross-Stage Deduplication for Deep Knowledge Recursion
+**Learning:** Stage 3b (Deepen Research) is a recursive process that triggers a new round of search queries in Stage 2 based on identified knowledge gaps. Without tracking previously fetched results, Stage 2 could re-discover, re-download, re-parse, and re-analyze the exact same sources, resulting in redundant network overhead, duplicate scraping, and wasted LLM API calls.
+**Action:** Always propagate identifiers of already-processed entities (e.g., URLs, titles) across stages to pre-populate local de-duplication states before executing expensive downstream pipelines (like recursive document discovery).
