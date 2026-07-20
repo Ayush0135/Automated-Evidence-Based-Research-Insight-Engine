@@ -65,9 +65,13 @@ def stage3b_deepen_research(analyzed_docs, topic):
         ]
     }
     
-    # 4. Run Stage 2 & 3 recursively
+    # Extract URLs and normalized titles of already analyzed documents to prevent duplicate work
+    existing_urls = {d['url'] for d in valid_docs if 'url' in d}
+    existing_titles = {d['title'].lower().strip() for d in valid_docs if 'title' in d}
+
+    # 4. Run Stage 2 & 3 recursively, passing existing documents to deduplicate upfront
     print("  Executing Recursive Search...")
-    new_raw_docs = stage2_document_discovery(deep_decomposition)
+    new_raw_docs = stage2_document_discovery(deep_decomposition, existing_urls=existing_urls, existing_titles=existing_titles)
     
     if not new_raw_docs:
         print("  No new documents found in deep dive.")
