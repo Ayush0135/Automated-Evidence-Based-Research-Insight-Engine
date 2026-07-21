@@ -67,7 +67,7 @@ def stage3b_deepen_research(analyzed_docs, topic):
     
     # 4. Run Stage 2 & 3 recursively
     print("  Executing Recursive Search...")
-    new_raw_docs = stage2_document_discovery(deep_decomposition)
+    new_raw_docs = stage2_document_discovery(deep_decomposition, existing_docs=analyzed_docs)
     
     if not new_raw_docs:
         print("  No new documents found in deep dive.")

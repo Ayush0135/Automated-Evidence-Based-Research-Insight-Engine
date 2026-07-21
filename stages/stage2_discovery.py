@@ -26,12 +26,21 @@ def process_search_item(item):
         print(f"Error processing {url}: {e}")
         return None
 
-def stage2_document_discovery(decomposition_data):
+def stage2_document_discovery(decomposition_data, existing_docs=None):
     print("\n--- STAGE 2: DOCUMENT DISCOVERY ---")
     
     all_documents = []
     seen_urls = set()
     seen_titles = set()
+
+    # Pre-populate seen_urls and seen_titles from existing_docs for cross-stage deduplication
+    if existing_docs:
+        for doc in existing_docs:
+            if 'url' in doc:
+                seen_urls.add(doc['url'])
+            if 'title' in doc:
+                seen_titles.add(doc['title'].lower().strip())
+
     search_candidates = []
     skip_domains = ['youtube.com', 'news.google.com', 'wikipedia.org']
     
