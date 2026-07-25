@@ -12,15 +12,21 @@ OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY")
 # Only use https://ollama.com/api if actually intended (which requires keys usually).
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
+# Global cached client instance to avoid repeated Client instantiation overhead
+_cached_client = None
+
 def get_client():
+    global _cached_client
     if OLLAMA_API_KEY:
-        # If we have an API key, we use the Client with headers
-        return Client(
-            host=OLLAMA_HOST,
-            headers={
-                'Authorization': f'Bearer {OLLAMA_API_KEY}'
-            }
-        )
+        if _cached_client is None:
+            # If we have an API key, we use the Client with headers
+            _cached_client = Client(
+                host=OLLAMA_HOST,
+                headers={
+                    'Authorization': f'Bearer {OLLAMA_API_KEY}'
+                }
+            )
+        return _cached_client
     return None # Use default ollama.chat
 
 def query_offline_llm(prompt, model_name=None):
